@@ -1,0 +1,20 @@
+{
+  "$schema": "./.dt-app/app.config.schema.json",
+  "environmentUrl": "https://yhu28601.apps.dynatrace.com/",
+  "app": {
+    "id": "my.nrql.translator",
+    "name": "NRQL to DQL Translator",
+    "version": "1.0.0",
+    "description": "Translate New Relic NRQL queries to Dynatrace DQL for migration",
+    "scopes": [
+      {
+        "name": "storage:logs:read",
+        "comment": "default template"
+      },
+      {
+        "name": "storage:buckets:read",
+        "comment": "default template"
+      }
+    ]
+  }
+}
