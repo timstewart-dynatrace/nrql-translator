@@ -1,0 +1,232 @@
+{
+  "basic": [
+    {
+      "name": "Simple count",
+      "nrql": "SELECT count(*) FROM Transaction",
+      "expectedDqlContains": ["fetch logs", "summarize", "count()"]
+    },
+    {
+      "name": "Count with filter",
+      "nrql": "SELECT count(*) FROM Transaction WHERE appName = 'MyApp'",
+      "expectedDqlContains": ["filter", "service.name", "count()"]
+    },
+    {
+      "name": "Select all",
+      "nrql": "SELECT * FROM Log",
+      "expectedDqlContains": ["fetch logs"]
+    },
+    {
+      "name": "Select specific fields",
+      "nrql": "SELECT timestamp, message, level FROM Log",
+      "expectedDqlContains": ["fetch logs", "fields"]
+    }
+  ],
+  "aggregations": [
+    {
+      "name": "Average",
+      "nrql": "SELECT average(duration) FROM Transaction",
+      "expectedDqlContains": ["avg(duration)"]
+    },
+    {
+      "name": "Sum",
+      "nrql": "SELECT sum(bytesReceived) FROM Transaction",
+      "expectedDqlContains": ["sum(bytesReceived)"]
+    },
+    {
+      "name": "Min/Max",
+      "nrql": "SELECT min(duration), max(duration) FROM Transaction",
+      "expectedDqlContains": ["min(duration)", "max(duration)"]
+    },
+    {
+      "name": "Unique count",
+      "nrql": "SELECT uniqueCount(host) FROM Transaction",
+      "expectedDqlContains": ["countDistinct(host)"]
+    },
+    {
+      "name": "Percentile",
+      "nrql": "SELECT percentile(duration, 95) FROM Transaction",
+      "expectedDqlContains": ["percentile(duration, 95)"]
+    },
+    {
+      "name": "Latest",
+      "nrql": "SELECT latest(status) FROM Transaction",
+      "expectedDqlContains": ["last(status)"]
+    },
+    {
+      "name": "Earliest",
+      "nrql": "SELECT earliest(timestamp) FROM Transaction",
+      "expectedDqlContains": ["first(timestamp)"]
+    },
+    {
+      "name": "Uniques",
+      "nrql": "SELECT uniques(host) FROM Transaction",
+      "expectedDqlContains": ["collectDistinct(host)"]
+    },
+    {
+      "name": "Median",
+      "nrql": "SELECT median(duration) FROM Transaction",
+      "expectedDqlContains": ["percentile(duration, 50)"]
+    },
+    {
+      "name": "Multiple aggregations",
+      "nrql": "SELECT count(*), average(duration), max(duration) FROM Transaction",
+      "expectedDqlContains": ["count()", "avg(duration)", "max(duration)"]
+    }
+  ],
+  "facet": [
+    {
+      "name": "Single facet",
+      "nrql": "SELECT count(*) FROM Transaction FACET host",
+      "expectedDqlContains": ["summarize", "by:{host"]
+    },
+    {
+      "name": "Multiple facets",
+      "nrql": "SELECT count(*) FROM Transaction FACET host, status",
+      "expectedDqlContains": ["by:{host", "status"]
+    },
+    {
+      "name": "Facet with aggregation alias",
+      "nrql": "SELECT count(*) AS requests FROM Transaction FACET host",
+      "expectedDqlContains": ["requests = count()", "by:{host"]
+    }
+  ],
+  "timeseries": [
+    {
+      "name": "Basic timeseries",
+      "nrql": "SELECT count(*) FROM Transaction TIMESERIES 5 minutes",
+      "expectedDqlContains": ["makeTimeseries", "interval:\"5m\""]
+    },
+    {
+      "name": "Timeseries with facet",
+      "nrql": "SELECT count(*) FROM Transaction FACET host TIMESERIES 1 hour",
+      "expectedDqlContains": ["makeTimeseries", "interval:\"1h\"", "by:{host"]
+    },
+    {
+      "name": "Timeseries auto",
+      "nrql": "SELECT count(*) FROM Transaction TIMESERIES AUTO",
+      "expectedDqlContains": ["makeTimeseries", "interval:\"1h\""]
+    }
+  ],
+  "where": [
+    {
+      "name": "Simple equality",
+      "nrql": "SELECT count(*) FROM Transaction WHERE status = 200",
+      "expectedDqlContains": ["filter", "status == 200"]
+    },
+    {
+      "name": "Not equal",
+      "nrql": "SELECT count(*) FROM Transaction WHERE status != 500",
+      "expectedDqlContains": ["filter", "status != 500"]
+    },
+    {
+      "name": "Greater than",
+      "nrql": "SELECT count(*) FROM Transaction WHERE duration > 1000",
+      "expectedDqlContains": ["filter", "duration > 1000"]
+    },
+    {
+      "name": "LIKE pattern",
+      "nrql": "SELECT count(*) FROM Transaction WHERE name LIKE '%payment%'",
+      "expectedDqlContains": ["filter", "contains"]
+    },
+    {
+      "name": "IN list",
+      "nrql": "SELECT count(*) FROM Transaction WHERE status IN (200, 201, 204)",
+      "expectedDqlContains": ["filter", "in(status"]
+    },
+    {
+      "name": "IS NULL",
+      "nrql": "SELECT count(*) FROM Transaction WHERE error IS NULL",
+      "expectedDqlContains": ["filter", "isNull(error)"]
+    },
+    {
+      "name": "IS NOT NULL",
+      "nrql": "SELECT count(*) FROM Transaction WHERE error IS NOT NULL",
+      "expectedDqlContains": ["filter", "isNotNull(error)"]
+    },
+    {
+      "name": "AND condition",
+      "nrql": "SELECT count(*) FROM Transaction WHERE status = 200 AND duration > 100",
+      "expectedDqlContains": ["filter", "and"]
+    },
+    {
+      "name": "OR condition",
+      "nrql": "SELECT count(*) FROM Transaction WHERE status = 200 OR status = 201",
+      "expectedDqlContains": ["filter", "or"]
+    }
+  ],
+  "orderAndLimit": [
+    {
+      "name": "Order by ascending",
+      "nrql": "SELECT count(*) AS cnt FROM Transaction FACET host ORDER BY cnt ASC",
+      "expectedDqlContains": ["sort", "cnt asc"]
+    },
+    {
+      "name": "Order by descending",
+      "nrql": "SELECT count(*) AS cnt FROM Transaction FACET host ORDER BY cnt DESC",
+      "expectedDqlContains": ["sort", "cnt desc"]
+    },
+    {
+      "name": "Limit",
+      "nrql": "SELECT count(*) FROM Transaction FACET host LIMIT 10",
+      "expectedDqlContains": ["limit 10"]
+    },
+    {
+      "name": "Order and limit",
+      "nrql": "SELECT count(*) AS cnt FROM Transaction FACET host ORDER BY cnt DESC LIMIT 5",
+      "expectedDqlContains": ["sort", "desc", "limit 5"]
+    }
+  ],
+  "eventTypes": [
+    {
+      "name": "Transaction",
+      "nrql": "SELECT count(*) FROM Transaction",
+      "expectedDqlContains": ["fetch logs", "log.source == \"apm\""]
+    },
+    {
+      "name": "Log",
+      "nrql": "SELECT count(*) FROM Log",
+      "expectedDqlContains": ["fetch logs"]
+    },
+    {
+      "name": "PageView",
+      "nrql": "SELECT count(*) FROM PageView",
+      "expectedDqlContains": ["fetch logs", "rum"]
+    },
+    {
+      "name": "Span",
+      "nrql": "SELECT count(*) FROM Span",
+      "expectedDqlContains": ["fetch spans"]
+    },
+    {
+      "name": "Unknown event type",
+      "nrql": "SELECT count(*) FROM CustomEvent",
+      "expectedDqlContains": ["fetch logs", "eventType"]
+    }
+  ],
+  "complex": [
+    {
+      "name": "Full query",
+      "nrql": "SELECT count(*), average(duration) FROM Transaction WHERE appName = 'MyApp' FACET host TIMESERIES 5 minutes",
+      "expectedDqlContains": ["fetch logs", "filter", "makeTimeseries", "count()", "avg(duration)", "interval:\"5m\"", "by:{host"]
+    },
+    {
+      "name": "Query with alias",
+      "nrql": "SELECT count(*) AS requests, average(duration) AS avg_duration FROM Transaction WHERE status = 200 FACET host, status",
+      "expectedDqlContains": ["requests = count()", "avg_duration = avg(duration)", "by:{host", "status"]
+    }
+  ],
+  "unsupported": [
+    {
+      "name": "COMPARE WITH",
+      "nrql": "SELECT count(*) FROM Transaction COMPARE WITH 1 week ago",
+      "shouldWarn": true,
+      "expectedWarningContains": "COMPARE WITH"
+    },
+    {
+      "name": "stddev function",
+      "nrql": "SELECT stddev(duration) FROM Transaction",
+      "shouldWarn": true,
+      "expectedWarningContains": "stddev"
+    }
+  ]
+}
