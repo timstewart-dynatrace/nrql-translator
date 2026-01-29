@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2025-01-29
+
+### Fixed
+- Fixed `makeTimeseries` interval parameter to use duration literal instead of quoted string
+  - Old: `interval:"1h"` (string - causes DQL syntax error)
+  - New: `interval:1h` (duration literal - correct)
+
 ## [1.0.6] - 2025-01-29
 
 ### Fixed

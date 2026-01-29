@@ -94,17 +94,17 @@
     {
       "name": "Basic timeseries",
       "nrql": "SELECT count(*) FROM Transaction TIMESERIES 5 minutes",
-      "expectedDqlContains": ["makeTimeseries", "interval:\"5m\""]
+      "expectedDqlContains": ["makeTimeseries", "interval:5m"]
     },
     {
       "name": "Timeseries with facet",
       "nrql": "SELECT count(*) FROM Transaction FACET host TIMESERIES 1 hour",
-      "expectedDqlContains": ["makeTimeseries", "interval:\"1h\"", "by:{host"]
+      "expectedDqlContains": ["makeTimeseries", "interval:1h", "by:{host"]
     },
     {
       "name": "Timeseries auto",
       "nrql": "SELECT count(*) FROM Transaction TIMESERIES AUTO",
-      "expectedDqlContains": ["makeTimeseries", "interval:\"1h\""]
+      "expectedDqlContains": ["makeTimeseries", "interval:1h"]
     }
   ],
   "where": [
@@ -207,7 +207,7 @@
     {
       "name": "Full query",
       "nrql": "SELECT count(*), average(duration) FROM Transaction WHERE appName = 'MyApp' FACET host TIMESERIES 5 minutes",
-      "expectedDqlContains": ["fetch logs", "filter", "makeTimeseries", "count()", "avg(duration)", "interval:\"5m\"", "by:{host"]
+      "expectedDqlContains": ["fetch logs", "filter", "makeTimeseries", "count()", "avg(duration)", "interval:5m", "by:{host"]
     },
     {
       "name": "Query with alias",

@@ -963,7 +963,7 @@ export class NRQLToDQLTranslator {
       aggregations.push('count = count()');
     }
 
-    let cmd = `| makeTimeseries ${aggregations.join(', ')}, interval:"${interval}"`;
+    let cmd = `| makeTimeseries ${aggregations.join(', ')}, interval:${interval}`;
 
     // Add grouping
     if (facet.length > 0) {
@@ -972,7 +972,7 @@ export class NRQLToDQLTranslator {
     }
 
     notes.keyDifferences.push(
-      `NRQL TIMESERIES ${timeseries.original} maps to DQL makeTimeseries with interval:"${interval}"`
+      `NRQL TIMESERIES ${timeseries.original} maps to DQL makeTimeseries with interval:${interval}`
     );
 
     return cmd;
