@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.18] - 2025-01-29
+
+### Fixed
+- Fixed DQL timeseries filter error - WHERE clause fields now automatically added to by:{} clause
+- DQL timeseries can only filter on dimensions in the by:{} clause
+- Added `extractFieldsFromWhere` helper to parse field names from WHERE conditions
+
 ## [1.0.17] - 2025-01-29
 
 ### Added
