@@ -1,6 +1,6 @@
 {
   "name": "@bhdynatrace/nrql-translator",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "NRQL to DQL translation library for New Relic to Dynatrace migration",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

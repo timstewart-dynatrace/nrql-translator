@@ -601,6 +601,12 @@ export class NRQLToDQLTranslator {
     notes: TranslationNotes
   ): string {
     const dqlParts: string[] = [];
+    const primaryType = parsed.from[0].toLowerCase();
+
+    // Check if this is a Metric query - requires special handling with timeseries command
+    if (primaryType === 'metric') {
+      return this.generateMetricDQL(parsed, context, warnings, notes);
+    }
 
     // Step 1: Generate fetch command
     const fetchCmd = this.generateFetch(parsed.from, context, notes);
@@ -679,6 +685,105 @@ export class NRQLToDQLTranslator {
     let result = dqlParts.join('\n');
     result = this.normalizeQuotes(result);
     return result;
+  }
+
+  /**
+   * Generate DQL for Metric event type using timeseries command
+   * Metric queries in DQL use a different pattern than fetch | filter | summarize
+   */
+  private generateMetricDQL(
+    parsed: ParsedNRQL,
+    context: TranslationContext | undefined,
+    warnings: string[],
+    notes: TranslationNotes
+  ): string {
+    const dqlParts: string[] = [];
+
+    notes.dataSourceMapping.push(
+      'Metric -> timeseries command (DQL uses timeseries for metric data instead of fetch)'
+    );
+    notes.keyDifferences.push(
+      'New Relic Metric queries translate to DQL timeseries command. Metric selectors may need adjustment to match Dynatrace metric keys.'
+    );
+
+    // Build aggregations for timeseries
+    const aggregations: string[] = [];
+    for (const agg of parsed.select.aggregations) {
+      const dqlAgg = this.translateMetricAggregation(agg, warnings, notes);
+      if (dqlAgg) {
+        aggregations.push(dqlAgg);
+      }
+    }
+
+    if (aggregations.length === 0) {
+      warnings.push('No valid aggregations found for Metric query');
+      aggregations.push('value = avg(metric.value)');
+    }
+
+    // Build timeseries command
+    let timeseriesCmd = `timeseries ${aggregations.join(', ')}`;
+
+    // Add grouping from FACET
+    if (parsed.facet.length > 0) {
+      const mappedFacets = parsed.facet.map(f => this.normalizeQuotes(f));
+      timeseriesCmd += `, by:{${mappedFacets.join(', ')}}`;
+    }
+
+    dqlParts.push(timeseriesCmd);
+
+    // Add filter for WHERE clause (comes after timeseries in DQL)
+    if (parsed.where) {
+      const translatedWhere = this.translateWhereConditions(
+        parsed.where,
+        context,
+        warnings,
+        notes
+      );
+      dqlParts.push(`| filter ${translatedWhere}`);
+    }
+
+    // Add limit if specified
+    if (parsed.limit) {
+      dqlParts.push(`| limit ${parsed.limit}`);
+    }
+
+    let result = dqlParts.join('\n');
+    result = this.normalizeQuotes(result);
+    return result;
+  }
+
+  /**
+   * Translate aggregation function for Metric queries
+   */
+  private translateMetricAggregation(
+    agg: AggregationFunction,
+    _warnings: string[],
+    notes: TranslationNotes
+  ): string | null {
+    const funcName = agg.name.toLowerCase();
+
+    // Map NRQL functions to DQL metric aggregations
+    const metricFunctionMap: Record<string, string> = {
+      'latest': 'last',
+      'earliest': 'first',
+      'average': 'avg',
+      'count': 'count',
+      'sum': 'sum',
+      'min': 'min',
+      'max': 'max',
+      'uniquecount': 'distinctcount',
+    };
+
+    const dqlFunc = metricFunctionMap[funcName] ?? funcName;
+    const metricSelector = agg.args[0] ?? 'metric.value';
+    const alias = agg.alias ?? `${funcName}_value`;
+
+    // For metrics, the argument is typically a metric selector
+    notes.dataModelRequirements.push(
+      `Verify metric selector "${metricSelector}" matches Dynatrace metric key format`
+    );
+
+    return `${alias} = ${dqlFunc}(${metricSelector})`;
   }
 
   /**

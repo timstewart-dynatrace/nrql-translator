@@ -211,7 +211,8 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host"
       );
-      expect(result.dql).toContain('fetch dt.metrics');
+      // Metric queries use timeseries command
+      expect(result.dql).toContain('timeseries');
       expect(result.dql).toContain('last(cpuUsage)');
       expect(result.dql).toContain('by:{');
     });
@@ -229,8 +230,9 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(cpuUsage) FACET host TIMESERIES"
       );
-      expect(result.dql).toContain('makeTimeseries');
-      expect(result.dql).toContain('interval:1h');
+      // Metric queries use timeseries command
+      expect(result.dql).toContain('timeseries');
+      expect(result.dql).toContain('by:{');
     });
   });
 
@@ -247,7 +249,7 @@ describe('NRQLToDQLTranslator', () => {
   describe('Flexible clause ordering', () => {
     it('should handle FACET before WHERE', () => {
       const result = translator.translate(
-        "FROM Metric SELECT latest(cpuUsage) FACET host WHERE appName = 'MyApp' TIMESERIES"
+        "FROM Transaction SELECT count(*) FACET host WHERE appName = 'MyApp' TIMESERIES 5 minutes"
       );
       expect(result.dql).toContain('makeTimeseries');
       expect(result.dql).toContain('by:{');
@@ -258,12 +260,25 @@ describe('NRQLToDQLTranslator', () => {
 
     it('should handle TIMESERIES at end of query without trailing space', () => {
       const result = translator.translate(
-        "FROM Metric SELECT latest(cpuUsage) FACET host WHERE appName = 'MyApp' TIMESERIES"
+        "FROM Transaction SELECT count(*) FACET host WHERE appName = 'MyApp' TIMESERIES"
       );
       // Make sure TIMESERIES keyword doesn't appear in DQL output (it becomes makeTimeseries)
       expect(result.dql).not.toContain('TIMESERIES');
       expect(result.dql).toContain('makeTimeseries');
       expect(result.dql).toContain('service.name');
+    });
+  });
+
+  describe('Metric queries', () => {
+    it('should use timeseries command for Metric event type', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host WHERE appName = 'MyApp'"
+      );
+      expect(result.dql).toContain('timeseries');
+      expect(result.dql).toContain('CPUUsage = last(cpuUsage)');
+      expect(result.dql).toContain('by:{');
+      expect(result.dql).toContain('filter');
+      expect(result.dql).not.toContain('fetch dt.metrics');
     });
   });
 

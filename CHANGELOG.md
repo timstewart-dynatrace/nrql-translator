@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.14] - 2025-01-29
+
+### Changed
+- Metric queries now use DQL `timeseries` command instead of invalid `fetch dt.metrics`
+- Added `generateMetricDQL` method for proper metric query translation
+- Metric queries generate: `timeseries alias = agg(metric.selector), by:{facets}`
+
 ## [1.0.13] - 2025-01-29
 
 ### Fixed
