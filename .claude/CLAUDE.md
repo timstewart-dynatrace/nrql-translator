@@ -58,7 +58,7 @@ npm run deploy      # Deploy to tenant
 3. Update `APP_VERSION` constant in `Translator.tsx`
 4. Update `CHANGELOG.md`
 
-Current version: **1.0.7**
+Current version: **1.0.8**
 
 ### Testing
 
