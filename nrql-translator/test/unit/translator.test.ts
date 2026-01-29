@@ -206,6 +206,44 @@ describe('NRQLToDQLTranslator', () => {
     });
   });
 
+  describe('FROM ... SELECT syntax', () => {
+    it('should translate FROM before SELECT', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host"
+      );
+      expect(result.dql).toContain('fetch dt.metrics');
+      expect(result.dql).toContain('last(cpuUsage)');
+      expect(result.dql).toContain('by:{');
+    });
+
+    it('should translate FROM before SELECT with WHERE', () => {
+      const result = translator.translate(
+        "FROM Transaction SELECT count(*) WHERE appName = 'MyApp'"
+      );
+      expect(result.dql).toContain('fetch logs');
+      expect(result.dql).toContain('count()');
+      expect(result.dql).toContain('service.name');
+    });
+
+    it('should translate FROM before SELECT with TIMESERIES', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(cpuUsage) FACET host TIMESERIES"
+      );
+      expect(result.dql).toContain('makeTimeseries');
+      expect(result.dql).toContain('interval:1h');
+    });
+  });
+
+  describe('Bare TIMESERIES clause', () => {
+    it('should handle TIMESERIES without interval', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction TIMESERIES"
+      );
+      expect(result.dql).toContain('makeTimeseries');
+      expect(result.dql).toContain('interval:1h');
+    });
+  });
+
   describe('Translation context', () => {
     it('should apply custom field mappings', () => {
       const result = translator.translate(
