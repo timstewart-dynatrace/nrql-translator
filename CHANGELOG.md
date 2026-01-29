@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.8] - 2025-01-29
+
+### Fixed
+- Fixed aggregation function parser to handle nested parentheses (e.g., `percentage(count(field), where condition)`)
+- Fixed WHERE clause parser to only match WHERE after FROM clause, avoiding false matches inside function calls
+- Added `splitArgsRespectingParens()` helper for proper argument parsing
+
 ## [1.0.7] - 2025-01-29
 
 ### Fixed

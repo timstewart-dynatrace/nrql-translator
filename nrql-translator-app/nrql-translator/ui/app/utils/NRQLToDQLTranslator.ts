@@ -312,26 +312,88 @@ export class NRQLToDQLTranslator {
 
   /**
    * Parse an aggregation function from a SELECT part
+   * Handles nested parentheses (e.g., percentage(count(field), where condition))
    */
   private parseAggregationFunction(part: string): AggregationFunction | null {
-    // Match function(args) AS alias or function(args)
-    const funcMatch = part.match(/^(\w+)\s*\(([^)]*)\)(?:\s+AS\s+['"]?(.+?)['"]?)?$/i);
-    if (!funcMatch) {
+    // First, try to match the function name
+    const nameMatch = part.match(/^(\w+)\s*\(/);
+    if (!nameMatch) {
       return null;
     }
 
-    const [, name, argsStr, alias] = funcMatch;
-    const args = argsStr
-      .split(',')
-      .map(a => a.trim())
-      .filter(a => a.length > 0);
+    const name = nameMatch[1];
+    const startIdx = nameMatch[0].length;
+
+    // Find the matching closing parenthesis by counting depth
+    let depth = 1;
+    let endIdx = startIdx;
+    for (let i = startIdx; i < part.length && depth > 0; i++) {
+      if (part[i] === '(') depth++;
+      else if (part[i] === ')') depth--;
+      if (depth === 0) {
+        endIdx = i;
+        break;
+      }
+    }
+
+    if (depth !== 0) {
+      return null; // Unbalanced parentheses
+    }
+
+    const argsStr = part.substring(startIdx, endIdx);
+    const afterFunc = part.substring(endIdx + 1).trim();
+
+    // Check for AS alias
+    let alias: string | null = null;
+    const aliasMatch = afterFunc.match(/^AS\s+['"]?(.+?)['"]?$/i);
+    if (aliasMatch) {
+      alias = aliasMatch[1].replace(/['"]/g, '');
+    } else if (afterFunc.length > 0 && !afterFunc.startsWith('AS')) {
+      // There's content after the function that isn't an alias
+      return null;
+    }
+
+    // For simple functions, split args by comma at depth 0
+    const args = this.splitArgsRespectingParens(argsStr);
 
     return {
       name: name.toLowerCase(),
       args,
-      alias: alias?.replace(/['"]/g, '') ?? null,
+      alias,
       original: part,
     };
+  }
+
+  /**
+   * Split function arguments by comma, respecting nested parentheses
+   */
+  private splitArgsRespectingParens(argsStr: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let depth = 0;
+
+    for (const char of argsStr) {
+      if (char === '(') {
+        depth++;
+        current += char;
+      } else if (char === ')') {
+        depth--;
+        current += char;
+      } else if (char === ',' && depth === 0) {
+        if (current.trim()) {
+          args.push(current.trim());
+        }
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    if (current.trim()) {
+      args.push(current.trim());
+    }
+
+    return args;
   }
 
   /**
@@ -348,11 +410,20 @@ export class NRQLToDQLTranslator {
 
   /**
    * Parse WHERE clause
+   * Only matches WHERE after the FROM clause to avoid matching 'where' inside function calls
    */
   private parseWhereClause(nrql: string): string | null {
+    // First find the FROM clause position to search for WHERE only after it
+    const fromMatch = nrql.match(/\bFROM\s+\w+/i);
+    if (!fromMatch) {
+      return null;
+    }
+
+    const afterFrom = nrql.substring(fromMatch.index! + fromMatch[0].length);
+
     // Match WHERE ... until next keyword or end
-    const whereMatch = nrql.match(
-      /WHERE\s+(.*?)(?=\s+(?:FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
+    const whereMatch = afterFrom.match(
+      /\bWHERE\s+(.*?)(?=\s+(?:FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
     );
     return whereMatch ? whereMatch[1].trim() : null;
   }
