@@ -121,7 +121,7 @@
     {
       "name": "Greater than",
       "nrql": "SELECT count(*) FROM Transaction WHERE duration > 1000",
-      "expectedDqlContains": ["filter", "duration > 1000"]
+      "expectedDqlContains": ["filter", "response_time > 1000"]
     },
     {
       "name": "LIKE pattern",
@@ -131,7 +131,7 @@
     {
       "name": "IN list",
       "nrql": "SELECT count(*) FROM Transaction WHERE status IN (200, 201, 204)",
-      "expectedDqlContains": ["filter", "in(status"]
+      "expectedDqlContains": ["filter", "in(status, {"]
     },
     {
       "name": "IS NULL",

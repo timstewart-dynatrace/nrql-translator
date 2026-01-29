@@ -58,7 +58,7 @@ npm run deploy      # Deploy to tenant
 3. Update `APP_VERSION` constant in `Translator.tsx`
 4. Update `CHANGELOG.md`
 
-Current version: **1.0.3**
+Current version: **1.0.4**
 
 ### Testing
 
@@ -109,6 +109,15 @@ private static readonly EVENT_TYPE_MAP: Record<string, EventTypeMapping> = {
   },
 };
 ```
+
+## Key DQL Syntax Rules
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| Arrays | `{"a", "b"}` | `('a', 'b')` |
+| Equality | `field == "value"` | `field = 'value'` |
+| IN operator | `in(field, {"a", "b"})` | `field IN ('a', 'b')` |
+| Named params | `round(val, decimals: 2)` | `round(val, 2)` |
 
 ## Workflow
 
