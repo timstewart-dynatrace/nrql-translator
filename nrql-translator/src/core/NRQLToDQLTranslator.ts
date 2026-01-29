@@ -738,7 +738,7 @@ export class NRQLToDQLTranslator {
       result = this.convertLikeOperator(result, notes);
     }
 
-    // IN -> in() with DQL array syntax {a, b}
+    // IN -> in() with DQL array() function
     result = result.replace(
       /(\w+)\s+IN\s*\(([^)]+)\)/gi,
       (_, field, values) => {
@@ -746,11 +746,11 @@ export class NRQLToDQLTranslator {
           .split(',')
           .map((v: string) => v.trim())
           .join(', ');
-        return `in(${field}, {${valueList}})`;
+        return `in(${field}, array(${valueList}))`;
       }
     );
 
-    // NOT IN -> NOT in() with DQL array syntax {a, b}
+    // NOT IN -> NOT in() with DQL array() function
     result = result.replace(
       /(\w+)\s+NOT\s+IN\s*\(([^)]+)\)/gi,
       (_, field, values) => {
@@ -758,7 +758,7 @@ export class NRQLToDQLTranslator {
           .split(',')
           .map((v: string) => v.trim())
           .join(', ');
-        return `NOT in(${field}, {${valueList}})`;
+        return `NOT in(${field}, array(${valueList}))`;
       }
     );
 
