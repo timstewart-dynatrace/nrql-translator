@@ -1,0 +1,37 @@
+
+SELECT rate(count(*), 1 minute) from Span where service.name = ‘sit-usf-auth-api' and span.kind = 'server' and http.method != 'OPTIONS' TIMESERIES  auto facet http.route
+
+
+
+SELECT percentile(duration.ms, 99) from Span where service.name = ‘sit-usf-auth-api' and span.kind = 'server' and http.method != 'OPTIONS' timeseries auto facet http.route
+
+
+
+
+SELECT percentage(count(http.status_code), where http.status_code > 199 and http.status_code < 300) as '2XX', percentage(count(http.status_code), where http.status_code > 399 and http.status_code < 500) as '4XX', percentage(count(http.status_code), where http.status_code > 499 and http.status_code < 600) as '5XX' from Span where service.name = ‘sit-usf-auth-api' and span.kind = 'server' and net.protocol.name = 'http' TIMESERIES auto
+
+
+
+
+SELECT (max(memoryUsedBytes)/1000000) as mb FROM K8sContainerSample WHERE podName like 'panamax-auth-api-%' and clusterName = 'usf-app-sit-panamax-eks-cluster' facet podName TIMESERIES limit max
+
+
+
+
+FROM Metric SELECT latest(`k8s.container.cpuUsedCores`) as CPUUsage FACET `k8s.containerName`, k8s.containerId  WHERE k8s.containerName='order-cdc-integration-api' AND k8s.clusterName ='usf-app-prod-panamax-eks-cluster' TIMESERIES
+
+
+
+
+FROM Log select count(*) as `errCount` where cluster_name = 'usf-app-sit-panamax-eks-cluster' and container_name = 'user-domain-api' and lower(level) = 'error' COMPARE WITH 1 week ago TIMESERIES
+
+
+
+FROM Span
+SELECT 
+  count(*) as 'Total API Calls',
+  average(duration.ms / 1000) as 'Response Time (Average)',
+  percentile(((duration.ms)/1000),95, 99.9, 99.5) as 'Response Time'
+where eventType() = 'Span' and span.kind = 'server' and ( (net.host.name = 'panamax-api.ama.usfoods.com' and entity.name like 'prod-usf-%-api' and service.name not like 'prod-usf-%-integration-api' and service.name not like 'prod-usf-order-cdc-%-api') or (entity.name like 'prod-usf-%-aiagent-python-api')) and http.target not like '%/sys-health/%' and http.target not like '%/health/%'
+since 7 days ago limit max UNTIL now
+
