@@ -11,6 +11,8 @@ import { TextArea } from "@dynatrace/strato-components-preview/forms";
 import { NRQLToDQLTranslator } from "../utils/NRQLToDQLTranslator";
 import { TranslationResult } from "../utils/types";
 
+const APP_VERSION = "1.0.3";
+
 export const Translator = () => {
   const [nrqlQuery, setNrqlQuery] = useState("");
   const [result, setResult] = useState<TranslationResult | null>(null);
@@ -64,6 +66,9 @@ export const Translator = () => {
           Translate New Relic Query Language (NRQL) queries to Dynatrace Query
           Language (DQL) for migration.
         </Paragraph>
+        <Text style={{ fontSize: "12px", color: "var(--dt-colors-text-neutral-default)" }}>
+          v{APP_VERSION}
+        </Text>
       </Flex>
 
       <Surface>

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2025-01-29
+
+### Added
+- Version number display on main Translator page
+
+### Changed
+- Feature branches now include version number (e.g., `feature/1.0.3-description`)
+
 ## [1.0.2] - 2025-01-29
 
 ### Fixed
