@@ -754,29 +754,52 @@ export class NRQLToDQLTranslator {
 
   /**
    * Translate aggregation function for Metric queries
+   * Note: DQL timeseries only supports: avg, sum, min, max, count, rate
    */
   private translateMetricAggregation(
     agg: AggregationFunction,
-    _warnings: string[],
+    warnings: string[],
     notes: TranslationNotes
   ): string | null {
     const funcName = agg.name.toLowerCase();
 
-    // Map NRQL functions to DQL metric aggregations
-    const metricFunctionMap: Record<string, string> = {
-      'latest': 'last',
-      'earliest': 'first',
-      'average': 'avg',
-      'count': 'count',
-      'sum': 'sum',
-      'min': 'min',
-      'max': 'max',
-      'uniquecount': 'distinctcount',
+    // Map NRQL functions to valid DQL timeseries aggregations
+    // Valid DQL timeseries aggregations: avg, sum, min, max, count, rate
+    const metricFunctionMap: Record<string, { dql: string; warning?: string }> = {
+      'latest': {
+        dql: 'avg',
+        warning: 'latest() converted to avg() - DQL timeseries does not support last(). Consider if avg() provides acceptable results for your use case.',
+      },
+      'earliest': {
+        dql: 'avg',
+        warning: 'earliest() converted to avg() - DQL timeseries does not support first(). Consider if avg() provides acceptable results for your use case.',
+      },
+      'average': { dql: 'avg' },
+      'avg': { dql: 'avg' },
+      'count': { dql: 'count' },
+      'sum': { dql: 'sum' },
+      'min': { dql: 'min' },
+      'max': { dql: 'max' },
+      'rate': { dql: 'rate' },
+      'uniquecount': {
+        dql: 'count',
+        warning: 'uniqueCount() converted to count() - DQL timeseries does not support distinctcount. Consider using a different query approach.',
+      },
     };
 
-    const dqlFunc = metricFunctionMap[funcName] ?? funcName;
+    const mapping = metricFunctionMap[funcName];
+    const dqlFunc = mapping?.dql ?? 'avg';
     const metricSelector = agg.args[0] ?? 'metric.value';
     const alias = agg.alias ?? `${funcName}_value`;
+
+    // Add warning if semantic translation occurred
+    if (mapping?.warning) {
+      warnings.push(mapping.warning);
+    } else if (!mapping) {
+      warnings.push(
+        `Unknown metric function "${funcName}" - using avg(). Valid DQL timeseries aggregations: avg, sum, min, max, count, rate.`
+      );
+    }
 
     // For metrics, the argument is typically a metric selector
     notes.dataModelRequirements.push(
