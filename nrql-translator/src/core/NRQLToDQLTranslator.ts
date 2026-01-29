@@ -545,7 +545,10 @@ export class NRQLToDQLTranslator {
       }
     }
 
-    return dqlParts.join('\n');
+    // Final pass: ensure all string literals use double quotes (DQL requirement)
+    let result = dqlParts.join('\n');
+    result = result.replace(/'/g, '"');
+    return result;
   }
 
   /**
@@ -738,9 +741,6 @@ export class NRQLToDQLTranslator {
     result = result.replace(/\bAND\b/gi, 'and');
     result = result.replace(/\bOR\b/gi, 'or');
     result = result.replace(/\bNOT\b/gi, 'NOT');
-
-    // DQL uses double quotes for strings, not single quotes
-    result = result.replace(/'([^']+)'/g, '"$1"');
 
     return result;
   }
