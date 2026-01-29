@@ -58,7 +58,7 @@ npm run deploy      # Deploy to tenant
 3. Update `APP_VERSION` constant in `Translator.tsx`
 4. Update `CHANGELOG.md`
 
-Current version: **1.0.4**
+Current version: **1.0.5**
 
 ### Testing
 
@@ -116,7 +116,7 @@ private static readonly EVENT_TYPE_MAP: Record<string, EventTypeMapping> = {
 |------|---------|-------|
 | Arrays | `{"a", "b"}` | `('a', 'b')` |
 | Equality | `field == "value"` | `field = 'value'` |
-| IN operator | `in(field, {"a", "b"})` | `field IN ('a', 'b')` |
+| IN operator | `in(field, array("a", "b"))` | `field IN ('a', 'b')` |
 | Named params | `round(val, decimals: 2)` | `round(val, 2)` |
 
 ## Workflow

@@ -131,7 +131,7 @@
     {
       "name": "IN list",
       "nrql": "SELECT count(*) FROM Transaction WHERE status IN (200, 201, 204)",
-      "expectedDqlContains": ["filter", "in(status, {"]
+      "expectedDqlContains": ["filter", "in(status, array("]
     },
     {
       "name": "IS NULL",

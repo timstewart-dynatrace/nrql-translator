@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2025-01-29
+
+### Fixed
+- Fixed IN operator to use correct DQL `array()` function syntax per official Dynatrace docs
+  - Old: `in(field, {200, 201})`
+  - New: `in(field, array(200, 201))`
+
 ## [1.0.4] - 2025-01-29
 
 ### Fixed
