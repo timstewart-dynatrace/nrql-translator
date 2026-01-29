@@ -244,6 +244,19 @@ describe('NRQLToDQLTranslator', () => {
     });
   });
 
+  describe('Flexible clause ordering', () => {
+    it('should handle FACET before WHERE', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(cpuUsage) FACET host WHERE appName = 'MyApp' TIMESERIES"
+      );
+      expect(result.dql).toContain('makeTimeseries');
+      expect(result.dql).toContain('by:{');
+      expect(result.dql).toContain('service.name');
+      // Make sure WHERE clause content isn't in the by:{} clause
+      expect(result.dql).not.toContain('by:{host.name WHERE');
+    });
+  });
+
   describe('Translation context', () => {
     it('should apply custom field mappings', () => {
       const result = translator.translate(
