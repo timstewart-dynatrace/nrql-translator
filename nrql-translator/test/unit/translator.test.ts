@@ -312,6 +312,17 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.dql).not.toContain('"k8s.container.cpuUsedCores"');
       expect(result.dql).not.toContain('"k8s.containerName"');
     });
+
+    it('should add WHERE fields to by:{} clause for timeseries', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(cpuUsage) as CPU FACET host WHERE clusterName = 'prod'"
+      );
+      // WHERE field should be automatically added to by:{} clause
+      expect(result.dql).toContain('by:{');
+      expect(result.dql).toContain('host');
+      expect(result.dql).toContain('k8s.cluster.name'); // clusterName mapped to k8s.cluster.name
+      expect(result.dql).toContain('filter');
+    });
   });
 
   describe('Translation context', () => {

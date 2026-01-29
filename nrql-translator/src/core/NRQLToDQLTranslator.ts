@@ -723,10 +723,32 @@ export class NRQLToDQLTranslator {
     // Build timeseries command
     let timeseriesCmd = `timeseries ${aggregations.join(', ')}`;
 
-    // Add grouping from FACET - strip quotes for DQL timeseries by:{} clause
-    if (parsed.facet.length > 0) {
-      const mappedFacets = parsed.facet.map(f => f.replace(/[`'"]/g, ''));
-      timeseriesCmd += `, by:{${mappedFacets.join(', ')}}`;
+    // Collect all fields for by:{} clause
+    // DQL timeseries requires filter fields to be in the by:{} clause
+    const byFields = new Set<string>();
+
+    // Add FACET fields
+    for (const f of parsed.facet) {
+      byFields.add(f.replace(/[`'"]/g, ''));
+    }
+
+    // Extract and add fields from WHERE clause
+    // DQL timeseries can only filter on dimensions in the by:{} clause
+    if (parsed.where) {
+      const whereFields = this.extractFieldsFromWhere(parsed.where);
+      for (const field of whereFields) {
+        byFields.add(field);
+      }
+    }
+
+    // Add grouping with all collected fields
+    if (byFields.size > 0) {
+      timeseriesCmd += `, by:{${Array.from(byFields).join(', ')}}`;
+      if (parsed.where) {
+        notes.keyDifferences.push(
+          'DQL timeseries requires filter dimensions in by:{} clause. WHERE fields automatically added to grouping.'
+        );
+      }
     }
 
     dqlParts.push(timeseriesCmd);
@@ -1385,6 +1407,30 @@ export class NRQLToDQLTranslator {
   // ==========================================================================
   // Utility Methods
   // ==========================================================================
+
+  /**
+   * Extract field names from a WHERE clause
+   * Matches patterns like: field = 'value', field == "value", field > 5, etc.
+   */
+  private extractFieldsFromWhere(where: string): string[] {
+    const fields: string[] = [];
+
+    // Match field names before comparison operators
+    // Handles: field = 'val', field == "val", field > 5, field IN (...), etc.
+    // Also handles backtick-quoted fields: `k8s.clusterName`
+    const fieldPattern = /(?:`([^`]+)`|([a-zA-Z_][a-zA-Z0-9_.]*))(?:\s*(?:==?|!=|<>|>=?|<=?|IN|NOT\s+IN|LIKE|NOT\s+LIKE|IS))/gi;
+
+    let match;
+    while ((match = fieldPattern.exec(where)) !== null) {
+      // Group 1 is backtick-quoted, Group 2 is unquoted
+      const field = (match[1] || match[2]).replace(/[`'"]/g, '');
+      if (field && !fields.includes(field)) {
+        fields.push(field);
+      }
+    }
+
+    return fields;
+  }
 
   /**
    * Escape special regex characters in a string
