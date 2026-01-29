@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2025-01-29
+
+### Fixed
+- Fixed field mapping regex to use negative lookbehind, preventing `service.name` from becoming `service.service.name`
+- Added preserve mappings for DQL fields (`service.name`, `span.kind`) to prevent incorrect transformations
+- Enhanced quote normalization to handle backticks and curly/smart quotes (Unicode U+2018, U+2019, U+201C, U+201D)
+
 ## [1.0.5] - 2025-01-29
 
 ### Fixed

@@ -637,9 +637,14 @@ export class NRQLToDQLTranslator {
 
   /**
    * Normalize quotes to double quotes for DQL
+   * Handles single quotes, backticks, and curly/smart quotes
    */
   private normalizeQuotes(str: string): string {
-    return str.replace(/'/g, '"');
+    return str
+      .replace(/'/g, '"')     // single quotes
+      .replace(/`/g, '"')     // backticks
+      .replace(/[\u2018\u2019]/g, '"')  // curly single quotes ' '
+      .replace(/[\u201C\u201D]/g, '"'); // curly double quotes " "
   }
 
   /**
@@ -674,49 +679,52 @@ export class NRQLToDQLTranslator {
     // Apply custom field mappings
     if (context?.fieldMappings) {
       for (const [nrField, dtField] of Object.entries(context.fieldMappings)) {
-        const regex = new RegExp(`\\b${this.escapeRegex(nrField)}\\b`, 'g');
+        // Use negative lookbehind for dot to avoid matching partial field paths
+        const regex = new RegExp(`(?<!\\.)\\b${this.escapeRegex(nrField)}\\b`, 'g');
         result = result.replace(regex, dtField);
       }
     }
 
     // Standard field mappings (expanded from reference project)
+    // Note: Order matters - more specific mappings (with dots) should come first
     const standardMappings: Record<string, string> = {
-      // Common fields
+      // Dotted fields first (more specific)
+      'service.name': 'service.name',  // preserve as-is
+      'span.kind': 'span.kind',        // preserve as-is
+      'http.method': 'http.request.method',
+      'http.url': 'http.url',
+      'http.statusCode': 'http.status_code',
+      'error.class': 'error.type',
+      'error.message': 'error.message',
+      'log.message': 'content',
+      'log.level': 'loglevel',
+      'request.uri': 'http.route',
+      'request.method': 'http.request.method',
+      'response.status': 'http.status_code',
+      // Simple fields (less specific) - use negative lookbehind for dot
       'timestamp': 'timestamp',
       'duration': 'response_time',
       'totalTime': 'response_time',
       'webDuration': 'response_time',
       'databaseDuration': 'db.response_time',
       'externalDuration': 'external.response_time',
-      'name': 'service.name',
       'transactionName': 'span.name',
       'host': 'host.name',
       'hostname': 'host.name',
       'appName': 'service.name',
       'appId': 'dt.entity.service',
       'entityGuid': 'dt.entity.service',
-      // Error fields
-      'error.class': 'error.type',
-      'error.message': 'error.message',
       'errorMessage': 'error.message',
       'errorType': 'error.type',
-      // HTTP fields
       'httpResponseCode': 'http.status_code',
-      'response.status': 'http.status_code',
-      'request.uri': 'http.route',
-      'request.method': 'http.request.method',
-      'http.url': 'http.url',
-      'http.statusCode': 'http.status_code',
-      // Log fields
       'message': 'content',
-      'log.message': 'content',
       'level': 'loglevel',
-      'log.level': 'loglevel',
       'severity': 'loglevel',
     };
 
     for (const [nrField, dtField] of Object.entries(standardMappings)) {
-      const regex = new RegExp(`\\b${this.escapeRegex(nrField)}\\b`, 'g');
+      // Use negative lookbehind for dot to avoid matching "name" in "service.name"
+      const regex = new RegExp(`(?<!\\.)\\b${this.escapeRegex(nrField)}\\b`, 'g');
       result = result.replace(regex, dtField);
     }
 

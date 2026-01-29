@@ -11,7 +11,7 @@ import { TextArea } from "@dynatrace/strato-components-preview/forms";
 import { NRQLToDQLTranslator } from "../utils/NRQLToDQLTranslator";
 import { TranslationResult } from "../utils/types";
 
-const APP_VERSION = "1.0.5";
+const APP_VERSION = "1.0.6";
 
 export const Translator = () => {
   const [nrqlQuery, setNrqlQuery] = useState("");
