@@ -723,15 +723,16 @@ export class NRQLToDQLTranslator {
     // Build timeseries command
     let timeseriesCmd = `timeseries ${aggregations.join(', ')}`;
 
-    // Add grouping from FACET
+    // Add grouping from FACET - strip quotes for DQL timeseries by:{} clause
     if (parsed.facet.length > 0) {
-      const mappedFacets = parsed.facet.map(f => this.normalizeQuotes(f));
+      const mappedFacets = parsed.facet.map(f => f.replace(/[`'"]/g, ''));
       timeseriesCmd += `, by:{${mappedFacets.join(', ')}}`;
     }
 
     dqlParts.push(timeseriesCmd);
 
     // Add filter for WHERE clause (comes after timeseries in DQL)
+    // Note: filter clause DOES need proper quoting for string values
     if (parsed.where) {
       const translatedWhere = this.translateWhereConditions(
         parsed.where,
@@ -739,7 +740,8 @@ export class NRQLToDQLTranslator {
         warnings,
         notes
       );
-      dqlParts.push(`| filter ${translatedWhere}`);
+      // Normalize quotes only for the filter clause (string values need double quotes)
+      dqlParts.push(`| filter ${this.normalizeQuotes(translatedWhere)}`);
     }
 
     // Add limit if specified
@@ -747,9 +749,7 @@ export class NRQLToDQLTranslator {
       dqlParts.push(`| limit ${parsed.limit}`);
     }
 
-    let result = dqlParts.join('\n');
-    result = this.normalizeQuotes(result);
-    return result;
+    return dqlParts.join('\n');
   }
 
   /**
@@ -789,7 +789,9 @@ export class NRQLToDQLTranslator {
 
     const mapping = metricFunctionMap[funcName];
     const dqlFunc = mapping?.dql ?? 'avg';
-    const metricSelector = agg.args[0] ?? 'metric.value';
+    const rawMetricSelector = agg.args[0] ?? 'metric.value';
+    // DQL timeseries metric keys must NOT be quoted - strip all quotes (backticks, single, double)
+    const metricSelector = rawMetricSelector.replace(/[`'"]/g, '');
     const alias = agg.alias ?? `${funcName}_value`;
 
     // Add warning if semantic translation occurred

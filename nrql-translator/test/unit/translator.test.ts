@@ -290,6 +290,18 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.warnings.some(w => w.includes('latest()'))).toBe(true);
       expect(result.warnings.some(w => w.includes('avg()'))).toBe(true);
     });
+
+    it('should not quote metric keys or facet fields in timeseries', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(`k8s.container.cpuUsedCores`) as CPUUsage FACET `k8s.containerName`"
+      );
+      // Metric keys and facet fields should NOT be quoted in DQL timeseries
+      expect(result.dql).toContain('avg(k8s.container.cpuUsedCores)');
+      expect(result.dql).toContain('by:{k8s.containerName}');
+      // Should NOT contain quoted versions
+      expect(result.dql).not.toContain('"k8s.container.cpuUsedCores"');
+      expect(result.dql).not.toContain('"k8s.containerName"');
+    });
   });
 
   describe('Translation context', () => {
