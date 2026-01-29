@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.9] - 2025-01-29
+
+### Fixed
+- Fixed parsing of arithmetic expressions containing aggregations (e.g., `(max(field)/1000) as alias`)
+- Arithmetic expressions with aggregations now correctly generate `summarize` commands instead of `fields`
+
 ## [1.0.8] - 2025-01-29
 
 ### Fixed
