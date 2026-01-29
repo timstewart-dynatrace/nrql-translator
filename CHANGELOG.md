@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2025-01-29
+
+### Fixed
+- Fixed `=` to `==` conversion corrupting quotes by using proper negative lookbehind/lookahead regex
+- Added `normalizeQuotes()` helper method for consistent quote conversion at multiple stages
+- Fixed IN operator to use correct DQL array syntax `{a, b}` instead of `array(a, b)`
+
+### Added
+- Expanded field mappings from reference project:
+  - HTTP fields: httpResponseCode, request.uri, request.method, http.statusCode
+  - Error fields: error.class, error.message, errorMessage, errorType
+  - Log fields: message, level, severity
+  - Duration fields: totalTime, webDuration, databaseDuration, externalDuration
+
 ## [1.0.3] - 2025-01-29
 
 ### Added

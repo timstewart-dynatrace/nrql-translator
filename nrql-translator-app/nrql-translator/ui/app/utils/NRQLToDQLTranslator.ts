@@ -547,7 +547,7 @@ export class NRQLToDQLTranslator {
 
     // Final pass: ensure all string literals use double quotes (DQL requirement)
     let result = dqlParts.join('\n');
-    result = result.replace(/'/g, '"');
+    result = this.normalizeQuotes(result);
     return result;
   }
 
@@ -636,6 +636,13 @@ export class NRQLToDQLTranslator {
   }
 
   /**
+   * Normalize quotes to double quotes for DQL
+   */
+  private normalizeQuotes(str: string): string {
+    return str.replace(/'/g, '"');
+  }
+
+  /**
    * Translate WHERE clause conditions to DQL filter syntax
    */
   private translateWhereConditions(
@@ -651,6 +658,9 @@ export class NRQLToDQLTranslator {
 
     // Convert operators
     result = this.convertOperators(result, warnings, notes);
+
+    // Normalize quotes to double quotes (DQL requirement)
+    result = this.normalizeQuotes(result);
 
     return result;
   }
@@ -669,15 +679,40 @@ export class NRQLToDQLTranslator {
       }
     }
 
-    // Standard field mappings
+    // Standard field mappings (expanded from reference project)
     const standardMappings: Record<string, string> = {
+      // Common fields
       'timestamp': 'timestamp',
-      'duration': 'duration',
-      'name': 'name',
+      'duration': 'response_time',
+      'totalTime': 'response_time',
+      'webDuration': 'response_time',
+      'databaseDuration': 'db.response_time',
+      'externalDuration': 'external.response_time',
+      'name': 'service.name',
+      'transactionName': 'span.name',
       'host': 'host.name',
+      'hostname': 'host.name',
       'appName': 'service.name',
-      'appId': 'service.id',
-      'entityGuid': 'dt.entity.id',
+      'appId': 'dt.entity.service',
+      'entityGuid': 'dt.entity.service',
+      // Error fields
+      'error.class': 'error.type',
+      'error.message': 'error.message',
+      'errorMessage': 'error.message',
+      'errorType': 'error.type',
+      // HTTP fields
+      'httpResponseCode': 'http.status_code',
+      'response.status': 'http.status_code',
+      'request.uri': 'http.route',
+      'request.method': 'http.request.method',
+      'http.url': 'http.url',
+      'http.statusCode': 'http.status_code',
+      // Log fields
+      'message': 'content',
+      'log.message': 'content',
+      'level': 'loglevel',
+      'log.level': 'loglevel',
+      'severity': 'loglevel',
     };
 
     for (const [nrField, dtField] of Object.entries(standardMappings)) {
@@ -703,7 +738,7 @@ export class NRQLToDQLTranslator {
       result = this.convertLikeOperator(result, notes);
     }
 
-    // IN -> in()
+    // IN -> in() with DQL array syntax {a, b}
     result = result.replace(
       /(\w+)\s+IN\s*\(([^)]+)\)/gi,
       (_, field, values) => {
@@ -711,11 +746,11 @@ export class NRQLToDQLTranslator {
           .split(',')
           .map((v: string) => v.trim())
           .join(', ');
-        return `in(${field}, array(${valueList}))`;
+        return `in(${field}, {${valueList}})`;
       }
     );
 
-    // NOT IN -> NOT in()
+    // NOT IN -> NOT in() with DQL array syntax {a, b}
     result = result.replace(
       /(\w+)\s+NOT\s+IN\s*\(([^)]+)\)/gi,
       (_, field, values) => {
@@ -723,7 +758,7 @@ export class NRQLToDQLTranslator {
           .split(',')
           .map((v: string) => v.trim())
           .join(', ');
-        return `NOT in(${field}, array(${valueList}))`;
+        return `NOT in(${field}, {${valueList}})`;
       }
     );
 
@@ -733,9 +768,9 @@ export class NRQLToDQLTranslator {
     // IS NOT NULL -> isNotNull()
     result = result.replace(/(\w+)\s+IS\s+NOT\s+NULL/gi, 'isNotNull($1)');
 
-    // Keep standard operators (=, !=, <, >, <=, >=) as-is
     // DQL uses == instead of = for equality
-    result = result.replace(/([^!=<>])=([^=])/g, '$1==$2');
+    // Use negative lookbehind/lookahead to avoid modifying !=, ==, <=, >=
+    result = result.replace(/(?<![!=<>])=(?!=)/g, '==');
 
     // AND/OR stay the same but lowercase
     result = result.replace(/\bAND\b/gi, 'and');
