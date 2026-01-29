@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.19] - 2025-01-29
+
+### Fixed
+- Fixed field name mismatch between by:{} clause and filter clause in timeseries
+- FACET and WHERE fields now get mapped to Dynatrace names (e.g., k8s.containerName → k8s.container.name)
+- Both by:{} clause and filter clause now use consistent mapped field names
+
 ## [1.0.18] - 2025-01-29
 
 ### Fixed

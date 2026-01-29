@@ -725,19 +725,24 @@ export class NRQLToDQLTranslator {
 
     // Collect all fields for by:{} clause
     // DQL timeseries requires filter fields to be in the by:{} clause
+    // Fields must be mapped to Dynatrace names to match the filter clause
     const byFields = new Set<string>();
 
-    // Add FACET fields
+    // Add FACET fields - apply field mapping so they match filter clause
     for (const f of parsed.facet) {
-      byFields.add(f.replace(/[`'"]/g, ''));
+      const cleanField = f.replace(/[`'"]/g, '');
+      const mappedField = this.mapFieldNames(cleanField, context);
+      byFields.add(mappedField);
     }
 
     // Extract and add fields from WHERE clause
     // DQL timeseries can only filter on dimensions in the by:{} clause
+    // Apply field mapping so by:{} fields match the filter clause
     if (parsed.where) {
       const whereFields = this.extractFieldsFromWhere(parsed.where);
       for (const field of whereFields) {
-        byFields.add(field);
+        const mappedField = this.mapFieldNames(field, context);
+        byFields.add(mappedField);
       }
     }
 
