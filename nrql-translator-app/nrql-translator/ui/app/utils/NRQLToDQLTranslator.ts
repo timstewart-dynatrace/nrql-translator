@@ -313,8 +313,38 @@ export class NRQLToDQLTranslator {
   /**
    * Parse an aggregation function from a SELECT part
    * Handles nested parentheses (e.g., percentage(count(field), where condition))
+   * Handles arithmetic expressions (e.g., (max(field)/1000) as alias)
    */
   private parseAggregationFunction(part: string): AggregationFunction | null {
+    // List of known aggregation functions
+    const aggFunctions = ['count', 'sum', 'avg', 'average', 'min', 'max', 'uniquecount',
+                          'percentile', 'latest', 'earliest', 'uniques', 'median',
+                          'stddev', 'rate', 'percentage', 'histogram', 'funnel', 'apdex'];
+
+    // Check if this is an arithmetic expression containing an aggregation
+    // Pattern: (aggFunc(field) operator value) AS alias
+    const arithmeticMatch = part.match(/^\((.+)\)\s*(?:AS\s+['"]?(.+?)['"]?)?$/i);
+    if (arithmeticMatch) {
+      const innerExpr = arithmeticMatch[1];
+      const alias = arithmeticMatch[2]?.replace(/['"]/g, '') ?? null;
+
+      // Check if innerExpr contains any aggregation function
+      const hasAggregation = aggFunctions.some(fn =>
+        new RegExp(`\\b${fn}\\s*\\(`, 'i').test(innerExpr)
+      );
+
+      if (hasAggregation) {
+        // This is an arithmetic expression with aggregation
+        // Store the whole expression and let translateAggregation handle it
+        return {
+          name: '_arithmetic_',
+          args: [innerExpr],
+          alias,
+          original: part,
+        };
+      }
+    }
+
     // First, try to match the function name
     const nameMatch = part.match(/^(\w+)\s*\(/);
     if (!nameMatch) {
@@ -954,6 +984,36 @@ export class NRQLToDQLTranslator {
     notes: TranslationNotes
   ): string | null {
     const funcName = agg.name.toLowerCase();
+
+    // Handle arithmetic expressions containing aggregations
+    if (funcName === '_arithmetic_') {
+      const expr = agg.args[0];
+      const alias = agg.alias ?? 'result';
+
+      // Extract the aggregation function from the arithmetic expression
+      // e.g., "max(memoryUsedBytes)/1000000" -> extract max(memoryUsedBytes)
+      const aggMatch = expr.match(/\b(count|sum|avg|average|min|max|uniquecount|percentile|latest|earliest|uniques|median)\s*\([^)]+\)/i);
+
+      if (aggMatch) {
+        // aggMatch[0] is the full match, aggMatch[1] is the function name
+        const aggFunc = aggMatch[1].toLowerCase();
+        const dqlFunc = NRQLToDQLTranslator.FUNCTION_MAP[aggFunc]?.dql ?? aggFunc;
+
+        // Replace the NRQL function with DQL function in the expression
+        let dqlExpr = expr.replace(new RegExp(`\\b${aggMatch[1]}\\b`, 'i'), dqlFunc);
+
+        // Generate with alias
+        notes.keyDifferences.push(
+          `Arithmetic expression "${agg.original}" translated inline. For complex expressions, consider using fieldsAdd for clarity.`
+        );
+
+        return `${alias} = ${dqlExpr}`;
+      }
+
+      // Fallback: pass through as-is with warning
+      warnings.push(`Could not parse arithmetic expression: ${expr}`);
+      return `${alias} = ${expr}`;
+    }
 
     // Check for unsupported functions
     if (NRQLToDQLTranslator.UNSUPPORTED_FUNCTIONS[funcName]) {
