@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.10] - 2025-01-29
+
+### Removed
+- Removed "Explore Data" page and navigation item
+- Removed "About" page and navigation item
+- App now only has the Translator page
+
 ## [1.0.9] - 2025-01-29
 
 ### Fixed
