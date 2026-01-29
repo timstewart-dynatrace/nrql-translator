@@ -204,6 +204,16 @@ describe('NRQLToDQLTranslator', () => {
       );
       expect(result.dql).toContain('host.name');
     });
+
+    it('should map Kubernetes fields', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction WHERE k8s.clusterName = 'my-cluster' AND k8s.containerName = 'my-container'"
+      );
+      expect(result.dql).toContain('k8s.cluster.name');
+      expect(result.dql).toContain('k8s.container.name');
+      expect(result.dql).not.toContain('k8s.clusterName');
+      expect(result.dql).not.toContain('k8s.containerName');
+    });
   });
 
   describe('FROM ... SELECT syntax', () => {

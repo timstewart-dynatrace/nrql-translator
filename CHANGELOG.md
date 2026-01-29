@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.17] - 2025-01-29
+
+### Added
+- Kubernetes field mappings for New Relic to Dynatrace field name translation
+- Maps k8s.clusterName → k8s.cluster.name
+- Maps k8s.containerName → k8s.container.name
+- Maps k8s.podName → k8s.pod.name
+- Maps k8s.namespaceName → k8s.namespace.name
+- And other common k8s field variations
+
 ## [1.0.16] - 2025-01-29
 
 ### Fixed

@@ -981,6 +981,24 @@ export class NRQLToDQLTranslator {
       'message': 'content',
       'level': 'loglevel',
       'severity': 'loglevel',
+      // Kubernetes fields - New Relic uses different naming than Dynatrace
+      'k8s.clusterName': 'k8s.cluster.name',
+      'k8s.containerName': 'k8s.container.name',
+      'k8s.podName': 'k8s.pod.name',
+      'k8s.namespaceName': 'k8s.namespace.name',
+      'k8s.nodeName': 'k8s.node.name',
+      'k8s.deploymentName': 'k8s.deployment.name',
+      'k8s.daemonSetName': 'k8s.daemonset.name',
+      'k8s.replicaSetName': 'k8s.replicaset.name',
+      'k8s.statefulSetName': 'k8s.statefulset.name',
+      'k8s.containerId': 'k8s.container.id',
+      'k8s.podId': 'k8s.pod.uid',
+      'k8s.namespaceId': 'k8s.namespace.uid',
+      'clusterName': 'k8s.cluster.name',
+      'containerName': 'k8s.container.name',
+      'podName': 'k8s.pod.name',
+      'namespaceName': 'k8s.namespace.name',
+      'nodeName': 'k8s.node.name',
     };
 
     for (const [nrField, dtField] of Object.entries(standardMappings)) {
