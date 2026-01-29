@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.13] - 2025-01-29
+
+### Fixed
+- Fixed WHERE and FACET clause regex to handle terminating keywords at end of query
+- Keywords like TIMESERIES at end of query (without trailing space) now properly terminate clauses
+
 ## [1.0.12] - 2025-01-29
 
 ### Fixed

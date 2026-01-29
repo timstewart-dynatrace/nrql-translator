@@ -466,8 +466,9 @@ export class NRQLToDQLTranslator {
     const afterFrom = nrql.substring(fromMatch.index! + fromMatch[0].length);
 
     // Match WHERE ... until next keyword or end
+    // Note: (?:\s|$) allows keywords at end of query without trailing space
     const whereMatch = afterFrom.match(
-      /\bWHERE\s+(.*?)(?=\s+(?:FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
+      /\bWHERE\s+(.*?)(?=\s+(?:FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)(?:\s|$)|$)/i
     );
     return whereMatch ? whereMatch[1].trim() : null;
   }
@@ -477,8 +478,9 @@ export class NRQLToDQLTranslator {
    * Note: NRQL allows flexible clause ordering (FACET can come before or after WHERE)
    */
   private parseFacetClause(nrql: string): string[] {
+    // Note: (?:\s|$) allows keywords at end of query without trailing space
     const facetMatch = nrql.match(
-      /FACET\s+(.*?)(?=\s+(?:WHERE|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
+      /FACET\s+(.*?)(?=\s+(?:WHERE|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)(?:\s|$)|$)/i
     );
     if (!facetMatch) {
       return [];

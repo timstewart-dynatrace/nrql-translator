@@ -255,6 +255,16 @@ describe('NRQLToDQLTranslator', () => {
       // Make sure WHERE clause content isn't in the by:{} clause
       expect(result.dql).not.toContain('by:{host.name WHERE');
     });
+
+    it('should handle TIMESERIES at end of query without trailing space', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(cpuUsage) FACET host WHERE appName = 'MyApp' TIMESERIES"
+      );
+      // Make sure TIMESERIES keyword doesn't appear in DQL output (it becomes makeTimeseries)
+      expect(result.dql).not.toContain('TIMESERIES');
+      expect(result.dql).toContain('makeTimeseries');
+      expect(result.dql).toContain('service.name');
+    });
   });
 
   describe('Translation context', () => {
