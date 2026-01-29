@@ -55,9 +55,10 @@ npm run deploy      # Deploy to tenant
 
 1. Update `nrql-translator/package.json`
 2. Update `nrql-translator-app/nrql-translator/app.config.json`
-3. Update `CHANGELOG.md`
+3. Update `APP_VERSION` constant in `Translator.tsx`
+4. Update `CHANGELOG.md`
 
-Current version: **1.0.2**
+Current version: **1.0.3**
 
 ### Testing
 
@@ -78,8 +79,9 @@ Current version: **1.0.2**
 |------|---------|
 | `nrql-translator/src/core/NRQLToDQLTranslator.ts` | Main translation logic |
 | `nrql-translator/src/core/types.ts` | Type definitions |
-| `nrql-translator-app/.../Translator.tsx` | UI component |
-| `app.config.json` | Dynatrace app configuration |
+| `nrql-translator-app/.../Translator.tsx` | UI component (contains APP_VERSION) |
+| `nrql-translator/package.json` | CLI library version |
+| `app.config.json` | Dynatrace app version |
 
 ## Common Tasks
 
@@ -110,10 +112,10 @@ private static readonly EVENT_TYPE_MAP: Record<string, EventTypeMapping> = {
 
 ## Workflow
 
-1. Create feature branch: `feature/description`
+1. Create feature branch with version: `feature/X.Y.Z-description`
 2. Make changes
 3. Run tests: `npm test`
-4. Update version in both locations
+4. Update version in all three locations (package.json, app.config.json, Translator.tsx)
 5. Update CHANGELOG.md
 6. Commit with descriptive message
 7. Merge to main with `--no-ff`
