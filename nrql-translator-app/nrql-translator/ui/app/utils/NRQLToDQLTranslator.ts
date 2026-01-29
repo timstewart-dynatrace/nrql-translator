@@ -229,15 +229,29 @@ export class NRQLToDQLTranslator {
 
   /**
    * Parse SELECT clause
+   * Handles both "SELECT ... FROM" and "FROM ... SELECT" orderings
    */
   private parseSelectClause(nrql: string): SelectClause {
-    // Match SELECT ... FROM
-    const selectMatch = nrql.match(/SELECT\s+(.*?)\s+FROM\s/i);
-    if (!selectMatch) {
-      throw new Error('Invalid NRQL: Missing SELECT clause');
-    }
+    let selectContent: string;
 
-    const selectContent = selectMatch[1].trim();
+    // Check if query starts with FROM (FROM ... SELECT pattern)
+    if (/^\s*FROM\s+/i.test(nrql)) {
+      // Pattern: FROM EventType SELECT ... [WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER BY|COMPARE WITH|WITH TIMEZONE]
+      const fromSelectMatch = nrql.match(
+        /FROM\s+\w+(?:\s*,\s*\w+)*\s+SELECT\s+(.*?)(?=\s+(?:WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
+      );
+      if (!fromSelectMatch) {
+        throw new Error('Invalid NRQL: Missing SELECT clause after FROM');
+      }
+      selectContent = fromSelectMatch[1].trim();
+    } else {
+      // Traditional pattern: SELECT ... FROM
+      const selectMatch = nrql.match(/SELECT\s+(.*?)\s+FROM\s/i);
+      if (!selectMatch) {
+        throw new Error('Invalid NRQL: Missing SELECT clause');
+      }
+      selectContent = selectMatch[1].trim();
+    }
 
     // Check for SELECT *
     if (selectContent === '*') {
@@ -474,27 +488,39 @@ export class NRQLToDQLTranslator {
 
   /**
    * Parse TIMESERIES clause
+   * Handles: TIMESERIES, TIMESERIES AUTO, TIMESERIES value unit
    */
   private parseTimeseriesClause(nrql: string): TimeseriesClause | null {
-    // Match TIMESERIES [AUTO | value unit]
-    const tsMatch = nrql.match(/TIMESERIES\s+(?:(\d+)\s+(\w+)|AUTO)/i);
-    if (!tsMatch) {
+    // First check if TIMESERIES exists at all
+    if (!/\bTIMESERIES\b/i.test(nrql)) {
       return null;
     }
 
-    if (tsMatch[1] && tsMatch[2]) {
+    // Match TIMESERIES with explicit interval: TIMESERIES value unit
+    const explicitMatch = nrql.match(/TIMESERIES\s+(\d+)\s+(\w+)/i);
+    if (explicitMatch) {
       return {
-        value: parseInt(tsMatch[1], 10),
-        unit: tsMatch[2].toLowerCase(),
-        original: tsMatch[0],
+        value: parseInt(explicitMatch[1], 10),
+        unit: explicitMatch[2].toLowerCase(),
+        original: explicitMatch[0],
       };
     }
 
-    // AUTO - default to 1 hour
+    // Match TIMESERIES AUTO
+    const autoMatch = nrql.match(/TIMESERIES\s+AUTO/i);
+    if (autoMatch) {
+      return {
+        value: 1,
+        unit: 'hour',
+        original: 'TIMESERIES AUTO',
+      };
+    }
+
+    // Bare TIMESERIES (no interval specified) - default to 1 hour
     return {
       value: 1,
       unit: 'hour',
-      original: 'TIMESERIES AUTO',
+      original: 'TIMESERIES',
     };
   }
 
