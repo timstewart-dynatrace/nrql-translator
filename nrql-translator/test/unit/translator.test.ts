@@ -211,9 +211,9 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host"
       );
-      // Metric queries use timeseries command
+      // Metric queries use timeseries command with avg() since DQL doesn't support last()
       expect(result.dql).toContain('timeseries');
-      expect(result.dql).toContain('last(cpuUsage)');
+      expect(result.dql).toContain('avg(cpuUsage)');
       expect(result.dql).toContain('by:{');
     });
 
@@ -275,10 +275,20 @@ describe('NRQLToDQLTranslator', () => {
         "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host WHERE appName = 'MyApp'"
       );
       expect(result.dql).toContain('timeseries');
-      expect(result.dql).toContain('CPUUsage = last(cpuUsage)');
+      // DQL timeseries only supports avg, sum, min, max, count, rate - latest() maps to avg()
+      expect(result.dql).toContain('CPUUsage = avg(cpuUsage)');
       expect(result.dql).toContain('by:{');
       expect(result.dql).toContain('filter');
       expect(result.dql).not.toContain('fetch dt.metrics');
+    });
+
+    it('should warn when latest() is converted to avg()', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(cpuUsage) as CPUUsage"
+      );
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => w.includes('latest()'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('avg()'))).toBe(true);
     });
   });
 

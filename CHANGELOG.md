@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.15] - 2025-01-29
+
+### Fixed
+- Fixed metric aggregation functions to use valid DQL timeseries aggregations
+- `latest()` and `earliest()` now map to `avg()` with warnings (DQL timeseries does not support `last()` or `first()`)
+- `uniqueCount()` now maps to `count()` with warning for metric queries
+- Added proper warnings when semantic translation occurs
+
 ## [1.0.14] - 2025-01-29
 
 ### Changed
