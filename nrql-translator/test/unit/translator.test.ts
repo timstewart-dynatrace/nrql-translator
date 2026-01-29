@@ -307,10 +307,11 @@ describe('NRQLToDQLTranslator', () => {
       );
       // Metric keys and facet fields should NOT be quoted in DQL timeseries
       expect(result.dql).toContain('avg(k8s.container.cpuUsedCores)');
-      expect(result.dql).toContain('by:{k8s.containerName}');
+      // k8s.containerName should be mapped to k8s.container.name in by:{} clause
+      expect(result.dql).toContain('by:{k8s.container.name}');
       // Should NOT contain quoted versions
       expect(result.dql).not.toContain('"k8s.container.cpuUsedCores"');
-      expect(result.dql).not.toContain('"k8s.containerName"');
+      expect(result.dql).not.toContain('"k8s.container.name"');
     });
 
     it('should add WHERE fields to by:{} clause for timeseries', () => {
@@ -322,6 +323,21 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.dql).toContain('host');
       expect(result.dql).toContain('k8s.cluster.name'); // clusterName mapped to k8s.cluster.name
       expect(result.dql).toContain('filter');
+    });
+
+    it('should map k8s field names in by:{} clause to match filter clause', () => {
+      const result = translator.translate(
+        "FROM Metric SELECT latest(k8s.container.cpuUsedCores) as CPUUsage FACET k8s.containerName, k8s.containerId WHERE k8s.containerName = 'my-container' AND k8s.clusterName = 'my-cluster'"
+      );
+      // Both FACET and WHERE k8s fields should be mapped in by:{} clause
+      expect(result.dql).toContain('by:{');
+      expect(result.dql).toContain('k8s.container.name'); // k8s.containerName mapped
+      expect(result.dql).toContain('k8s.container.id'); // k8s.containerId mapped
+      expect(result.dql).toContain('k8s.cluster.name'); // k8s.clusterName mapped
+      // Unmapped versions should NOT appear in by:{} clause
+      expect(result.dql).not.toMatch(/by:\{[^}]*k8s\.containerName[^}]*\}/);
+      expect(result.dql).not.toMatch(/by:\{[^}]*k8s\.containerId[^}]*\}/);
+      expect(result.dql).not.toMatch(/by:\{[^}]*k8s\.clusterName[^}]*\}/);
     });
   });
 

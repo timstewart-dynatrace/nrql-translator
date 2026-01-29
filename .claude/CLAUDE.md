@@ -58,12 +58,12 @@ npm run deploy      # Deploy to tenant
 3. Update `APP_VERSION` constant in `Translator.tsx`
 4. Update `CHANGELOG.md`
 
-Current version: **1.0.18**
+Current version: **1.0.19**
 
 ### Testing
 
 - Run `npm test` before committing
-- All 52 tests must pass
+- All tests must pass
 - Add tests for new functionality
 
 ## Code Style
