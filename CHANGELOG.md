@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.16] - 2025-01-29
+
+### Fixed
+- Fixed metric key quoting in DQL timeseries command - metric keys must NOT be quoted
+- Strip quotes (backticks, single, double) from metric selectors and FACET fields in timeseries
+- Filter clause still properly quotes string values
+
 ## [1.0.15] - 2025-01-29
 
 ### Fixed
