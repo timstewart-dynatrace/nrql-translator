@@ -474,10 +474,11 @@ export class NRQLToDQLTranslator {
 
   /**
    * Parse FACET clause
+   * Note: NRQL allows flexible clause ordering (FACET can come before or after WHERE)
    */
   private parseFacetClause(nrql: string): string[] {
     const facetMatch = nrql.match(
-      /FACET\s+(.*?)(?=\s+(?:TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
+      /FACET\s+(.*?)(?=\s+(?:WHERE|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
     );
     if (!facetMatch) {
       return [];
