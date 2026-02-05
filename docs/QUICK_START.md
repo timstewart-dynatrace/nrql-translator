@@ -98,12 +98,12 @@ Options:
 
 The translator maps NRQL event types to DQL data sources:
 
-| If your NRQL uses... | Translator fetches... |
+| If your NRQL uses... | Translator produces... |
 |----------------------|----------------------|
 | Transaction | `fetch logs` with APM filter |
 | Span | `fetch spans` |
 | Log | `fetch logs` |
-| Metric | `fetch dt.metrics` |
+| Metric | `timeseries` command (DQL uses timeseries for metrics, not fetch) |
 | PageView/PageAction | `fetch logs` with RUM filter |
 
 ### Field Name Mapping
