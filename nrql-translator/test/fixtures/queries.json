@@ -129,6 +129,11 @@
       "expectedDqlContains": ["filter", "contains"]
     },
     {
+      "name": "LIKE with dotted field name",
+      "nrql": "SELECT count(*) FROM Span WHERE http.target LIKE '/api/%'",
+      "expectedDqlContains": ["filter", "startsWith(http.target"]
+    },
+    {
       "name": "IN list",
       "nrql": "SELECT count(*) FROM Transaction WHERE status IN (200, 201, 204)",
       "expectedDqlContains": ["filter", "in(status, array("]

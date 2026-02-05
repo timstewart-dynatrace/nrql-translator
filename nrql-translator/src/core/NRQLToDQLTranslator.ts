@@ -1095,31 +1095,34 @@ export class NRQLToDQLTranslator {
 
   /**
    * Convert LIKE operator to DQL equivalent
+   * Note: Field pattern includes dots to support dotted field names like http.target
    */
   private convertLikeOperator(expr: string, notes: TranslationNotes): string {
     let result = expr;
+    // Pattern to match field names including dots (e.g., http.target, service.name)
+    const fieldPattern = '([a-zA-Z_][a-zA-Z0-9_.]*)';
 
-    // Simple patterns with % wildcards
+    // Simple patterns with % wildcards (contains)
     result = result.replace(
-      /(\w+)\s+LIKE\s+['"]%([^%'"]+)%['"]/gi,
+      new RegExp(`${fieldPattern}\\s+LIKE\\s+['"]%([^%'"]+)%['"]`, 'gi'),
       'contains($1, "$2")'
     );
 
     // Starts with pattern
     result = result.replace(
-      /(\w+)\s+LIKE\s+['"]([^%'"]+)%['"]/gi,
+      new RegExp(`${fieldPattern}\\s+LIKE\\s+['"]([^%'"]+)%['"]`, 'gi'),
       'startsWith($1, "$2")'
     );
 
     // Ends with pattern
     result = result.replace(
-      /(\w+)\s+LIKE\s+['"]%([^%'"]+)['"]/gi,
+      new RegExp(`${fieldPattern}\\s+LIKE\\s+['"]%([^%'"]+)['"]`, 'gi'),
       'endsWith($1, "$2")'
     );
 
     // Complex patterns - use matchesValue
     result = result.replace(
-      /(\w+)\s+LIKE\s+['"](.+?)['"]/gi,
+      new RegExp(`${fieldPattern}\\s+LIKE\\s+['"](.+?)['"]`, 'gi'),
       (_match, field, pattern) => {
         // Convert SQL LIKE pattern to regex
         const regexPattern = pattern.replace(/%/g, '.*').replace(/_/g, '.');
@@ -1132,7 +1135,7 @@ export class NRQLToDQLTranslator {
 
     // NOT LIKE
     result = result.replace(
-      /(\w+)\s+NOT\s+LIKE\s+['"](.+?)['"]/gi,
+      new RegExp(`${fieldPattern}\\s+NOT\\s+LIKE\\s+['"](.+?)['"]`, 'gi'),
       (_match, field, pattern) => {
         const regexPattern = pattern.replace(/%/g, '.*').replace(/_/g, '.');
         return `NOT matchesValue(${field}, "${regexPattern}")`;
