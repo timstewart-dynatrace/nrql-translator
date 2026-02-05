@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.21] - 2025-02-05
+
+### Added
+- Added storage scopes for metrics, spans, and events to app.config.json
+- App now has permissions to execute translated queries for all data sources
+
 ## [1.0.20] - 2025-02-05
 
 ### Fixed

@@ -1,19 +1,31 @@
 {
   "$schema": "./.dt-app/app.config.schema.json",
-  "environmentUrl": "https://yhu28601.apps.dynatrace.com/",
+  "environmentUrl": "https://bxa51304.apps.dynatrace.com/",
   "app": {
     "id": "my.nrql.translator",
     "name": "NRQL to DQL Translator",
-    "version": "1.0.20",
+    "version": "1.0.21",
     "description": "Translate New Relic NRQL queries to Dynatrace DQL for migration",
     "scopes": [
       {
         "name": "storage:logs:read",
-        "comment": "default template"
+        "comment": "For log queries (Transaction, Log, PageView, etc.)"
       },
       {
         "name": "storage:buckets:read",
-        "comment": "default template"
+        "comment": "For bucket access"
+      },
+      {
+        "name": "storage:metrics:read",
+        "comment": "For metric/timeseries queries"
+      },
+      {
+        "name": "storage:spans:read",
+        "comment": "For span/trace queries"
+      },
+      {
+        "name": "storage:events:read",
+        "comment": "For event queries"
       }
     ]
   }
