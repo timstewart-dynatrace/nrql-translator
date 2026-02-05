@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.24] - 2025-02-05
+
+### Added
+- Created `docs/LESSONS_LEARNED.md` documenting DQL syntax rules and common pitfalls
+- Added Kubernetes field mapping table to README.md
+
+### Fixed
+- Updated README.md and QUICK_START.md: Metric queries use `timeseries` command, not `fetch dt.metrics`
+
 ## [1.0.23] - 2025-02-05
 
 ### Fixed

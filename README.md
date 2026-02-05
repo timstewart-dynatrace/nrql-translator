@@ -52,8 +52,17 @@ This project provides two ways to translate NRQL queries to DQL:
 | `Transaction` | `fetch logs` with APM filter |
 | `Span` | `fetch spans` |
 | `Log` | `fetch logs` |
-| `Metric` | `fetch dt.metrics` |
+| `Metric` | `timeseries` command (DQL metric queries use timeseries, not fetch) |
 | `PageView` | `fetch logs` with RUM filter |
+
+### Kubernetes Field Mapping
+
+| NRQL Field | DQL Field |
+|------------|-----------|
+| `k8s.clusterName` | `k8s.cluster.name` |
+| `k8s.containerName` | `k8s.container.name` |
+| `k8s.podName` | `k8s.pod.name` |
+| `k8s.namespaceName` | `k8s.namespace.name` |
 
 ## Quick Start
 
