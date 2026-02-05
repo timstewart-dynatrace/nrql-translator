@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.20] - 2025-02-05
+
+### Fixed
+- Fixed spacing in by:{} clause - now uses proper comma spacing (e.g., `by:{host, status}` instead of `by:{host,status}`)
+- Consistent formatting in summarize and makeTimeseries commands
+
+### Changed
+- Updated npm dependencies to latest compatible versions
+
 ## [1.0.19] - 2025-01-29
 
 ### Fixed
