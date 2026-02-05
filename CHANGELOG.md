@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.22] - 2025-02-05
+
+### Fixed
+- Fixed LIKE operator with dotted field names (e.g., `http.target LIKE '/api/%'`)
+- Field names containing dots now correctly produce `startsWith(http.target, ...)` instead of invalid `http.startsWith(target, ...)`
+
 ## [1.0.21] - 2025-02-05
 
 ### Added
