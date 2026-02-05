@@ -4,7 +4,7 @@
   "app": {
     "id": "my.nrql.translator",
     "name": "NRQL to DQL Translator",
-    "version": "1.0.19",
+    "version": "1.0.20",
     "description": "Translate New Relic NRQL queries to Dynatrace DQL for migration",
     "scopes": [
       {

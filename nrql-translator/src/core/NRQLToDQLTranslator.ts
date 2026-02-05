@@ -1170,7 +1170,7 @@ export class NRQLToDQLTranslator {
     // Add FACET as by:{}
     if (facet.length > 0) {
       const mappedFacets = facet.map(f => this.mapFieldNames(f, undefined));
-      cmd += `, by:{${mappedFacets.join(',')}}`;
+      cmd += `, by:{${mappedFacets.join(', ')}}`;
       notes.keyDifferences.push(
         'NRQL FACET clause maps to DQL by:{} syntax in summarize command'
       );
@@ -1303,7 +1303,7 @@ export class NRQLToDQLTranslator {
     // Add grouping
     if (facet.length > 0) {
       const mappedFacets = facet.map(f => this.mapFieldNames(f, undefined));
-      cmd += `, by:{${mappedFacets.join(',')}}`;
+      cmd += `, by:{${mappedFacets.join(', ')}}`;
     }
 
     notes.keyDifferences.push(
