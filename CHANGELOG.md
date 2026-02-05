@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.23] - 2025-02-05
+
+### Fixed
+- Fixed arithmetic aggregation expressions without outer parentheses (e.g., `average(duration.ms)/1000`)
+- Now correctly recognized as aggregation and translated to `summarize avg(duration.ms)/1000` instead of `fields average(...)`
+
 ## [1.0.22] - 2025-02-05
 
 ### Fixed
