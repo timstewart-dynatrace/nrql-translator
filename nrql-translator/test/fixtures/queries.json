@@ -71,6 +71,11 @@
       "name": "Multiple aggregations",
       "nrql": "SELECT count(*), average(duration), max(duration) FROM Transaction",
       "expectedDqlContains": ["count()", "avg(duration)", "max(duration)"]
+    },
+    {
+      "name": "Arithmetic aggregation without parens",
+      "nrql": "SELECT average(duration.ms)/1000 FROM Span",
+      "expectedDqlContains": ["summarize", "avg(duration.ms)/1000"]
     }
   ],
   "facet": [

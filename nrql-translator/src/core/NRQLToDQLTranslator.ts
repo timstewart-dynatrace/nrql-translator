@@ -336,7 +336,7 @@ export class NRQLToDQLTranslator {
                           'stddev', 'rate', 'percentage', 'histogram', 'funnel', 'apdex'];
 
     // Check if this is an arithmetic expression containing an aggregation
-    // Pattern: (aggFunc(field) operator value) AS alias
+    // Pattern 1: (aggFunc(field) operator value) AS alias (with outer parens)
     const arithmeticMatch = part.match(/^\((.+)\)\s*(?:AS\s+['"]?(.+?)['"]?)?$/i);
     if (arithmeticMatch) {
       const innerExpr = arithmeticMatch[1];
@@ -354,6 +354,27 @@ export class NRQLToDQLTranslator {
           name: '_arithmetic_',
           args: [innerExpr],
           alias,
+          original: part,
+        };
+      }
+    }
+
+    // Pattern 2: aggFunc(field) operator value AS alias (without outer parens)
+    // e.g., average(duration.ms)/1000, max(bytes)*100 AS scaled
+    const arithmeticNoParensMatch = part.match(
+      /^(\w+)\s*\(([^)]+)\)\s*([+\-*\/])\s*(\d+(?:\.\d+)?)\s*(?:AS\s+['"]?(.+?)['"]?)?$/i
+    );
+    if (arithmeticNoParensMatch) {
+      const [, funcName, funcArgs, operator, operand, alias] = arithmeticNoParensMatch;
+      const funcLower = funcName.toLowerCase();
+
+      // Check if it's an aggregation function
+      if (aggFunctions.includes(funcLower)) {
+        const expr = `${funcName}(${funcArgs})${operator}${operand}`;
+        return {
+          name: '_arithmetic_',
+          args: [expr],
+          alias: alias?.replace(/['"]/g, '') ?? null,
           original: part,
         };
       }
