@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.26] - 2025-02-05
+
+### Added
+- **COMPARE WITH support**: Translator now generates DQL `append` pattern for NRQL `COMPARE WITH` clauses
+- Automatically generates time-shifted queries with `current_` and `previous_` prefixed aggregations
+- Calculates correct time offsets (e.g., `1 week ago` → `-192h, to:-168h` with `timestamp + 168h`)
+- Falls back to warning for unparseable time expressions (e.g., "last tuesday")
+
+### Changed
+- Reduced confidence penalty for COMPARE WITH from -20 to -5 since it's now supported
+- Added 3 new tests for COMPARE WITH functionality
+
+## [1.0.25] - 2025-02-05
+
+### Added
+- Documented DQL time comparison pattern using `append` command (equivalent to NRQL `COMPARE WITH`)
+- Pattern uses time-shifted queries overlaid on same chart for period comparison
+
+### Changed
+- Updated `COMPARE WITH` warning message to reference the `append` pattern in LESSONS_LEARNED.md
+- Improved QUICK_START.md warning table with actionable guidance
+
 ## [1.0.24] - 2025-02-05
 
 ### Added

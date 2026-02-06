@@ -167,6 +167,37 @@ When writing regex patterns to match field names, remember that NRQL field names
 /([a-zA-Z_][a-zA-Z0-9_.]*)\s+LIKE/
 ```
 
+### 11. Time Comparison Using `append` (COMPARE WITH equivalent)
+
+NRQL's `COMPARE WITH` clause has no direct DQL equivalent. In DQL, use the `append` command to overlay current data with a previous time period:
+
+**Pattern:**
+```dql
+fetch spans, from:-1h
+| filter environment == lower("BETA")
+| filter matchesPhrase(service.name, "my-service")
+| makeTimeseries {
+  transactions = countIf(request.is_failed == true)},
+  time:start_time, interval: 10m
+| append [
+  fetch spans, from:-25h, to:-24h
+  | filter environment == lower("BETA")
+  | filter matchesPhrase(service.name, "my-service")
+  | fieldsAdd start_time = start_time + 24h    -- Time-shift to align with current
+  | makeTimeseries {previous_transactions = countIf(request.is_failed == true)},
+    time:start_time, interval: 10m, from:-1h, to:now()
+]
+```
+
+**Key elements:**
+1. First query: Current timeframe (e.g., `from:-1h`)
+2. Second query in `append []`: Previous timeframe (e.g., `from:-25h, to:-24h` for 24h ago)
+3. Time-shift the timestamp field: `fieldsAdd start_time = start_time + 24h`
+4. Align the makeTimeseries boundaries: `from:-1h, to:now()` to match the first query
+5. Use different aggregation names to distinguish series (e.g., `transactions` vs `previous_transactions`)
+
+This overlays the two time periods on the same chart for visual comparison.
+
 ## Testing Recommendations
 
 1. Always test translations in actual Dynatrace environment

@@ -144,6 +144,35 @@ export class NRQLToDQLTranslator {
     'weeks': 'w',
   };
 
+  /**
+   * Parse a time expression like "1 week ago" or "7 days ago" and return DQL duration components
+   * Returns { value: number, unit: string, dqlDuration: string } or null if unparseable
+   */
+  private parseTimeExpression(
+    timeExpr: string
+  ): { value: number; unit: string; dqlDuration: string; totalHours: number } | null {
+    // Match patterns like "1 week ago", "7 days ago", "24 hours ago"
+    const match = timeExpr.match(/(\d+)\s*(second|seconds|minute|minutes|hour|hours|day|days|week|weeks)\s*ago/i);
+    if (!match) return null;
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    const dqlUnit = NRQLToDQLTranslator.TIME_UNIT_MAP[unit] ?? 'h';
+    const dqlDuration = `${value}${dqlUnit}`;
+
+    // Calculate total hours for offset calculation
+    const hoursMultiplier: Record<string, number> = {
+      's': 1 / 3600,
+      'm': 1 / 60,
+      'h': 1,
+      'd': 24,
+      'w': 168,
+    };
+    const totalHours = value * (hoursMultiplier[dqlUnit] ?? 1);
+
+    return { value, unit, dqlDuration, totalHours };
+  }
+
   // ==========================================================================
   // Main Translation Method
   // ==========================================================================
@@ -677,14 +706,85 @@ export class NRQLToDQLTranslator {
       dqlParts.push(`| limit ${parsed.limit}`);
     }
 
-    // Step 6: Handle unsupported clauses
+    // Step 6: Handle COMPARE WITH using append pattern
     if (parsed.compareWith) {
-      warnings.push(
-        `COMPARE WITH clause is not directly supported in DQL. Original: COMPARE WITH ${parsed.compareWith}`
-      );
-      notes.keyDifferences.push(
-        'DQL does not have a direct COMPARE WITH equivalent. Use separate queries or dashboard comparison features.'
-      );
+      const compareTime = this.parseTimeExpression(parsed.compareWith);
+      const sinceTime = parsed.since ? this.parseTimeExpression(parsed.since) : null;
+
+      if (compareTime) {
+        // Calculate time windows
+        const currentWindow = sinceTime?.dqlDuration ?? '1d';
+        const currentWindowHours = sinceTime?.totalHours ?? 24;
+        const compareOffsetHours = compareTime.totalHours;
+
+        // Build the append query with time-shifted timestamps
+        const fetchCmd = this.generateFetch(parsed.from, context, notes);
+        const filterCmd = this.generateFilter(parsed.from, parsed.where, context, warnings, notes);
+
+        // Generate aggregations with "previous_" prefix
+        const previousAggregations: string[] = [];
+        for (const agg of parsed.select.aggregations) {
+          const dqlAgg = this.translateAggregation(agg, warnings, notes);
+          if (dqlAgg) {
+            // Prefix alias with "previous_"
+            const prefixedAgg = dqlAgg.replace(/^(\w+)\s*=/, 'previous_$1 =');
+            previousAggregations.push(prefixedAgg);
+          }
+        }
+
+        // Rename current aggregations to "current_" prefix
+        const renamedParts = dqlParts.map((part) => {
+          if (part.startsWith('| summarize') || part.startsWith('| makeTimeseries')) {
+            // Add "current_" prefix to aggregation aliases
+            return part.replace(/(\w+)\s*=/g, 'current_$1 =');
+          }
+          return part;
+        });
+
+        // Build append subquery
+        const appendParts: string[] = [];
+        appendParts.push(`  ${fetchCmd}, from:-${compareOffsetHours + currentWindowHours}h, to:-${compareOffsetHours}h`);
+        if (filterCmd) {
+          appendParts.push(`  ${filterCmd}`);
+        }
+        appendParts.push(`  | fieldsAdd timestamp = timestamp + ${compareOffsetHours}h`);
+
+        if (parsed.timeseries) {
+          const dqlUnit = NRQLToDQLTranslator.TIME_UNIT_MAP[parsed.timeseries.unit] ?? 'm';
+          const interval = `${parsed.timeseries.value}${dqlUnit}`;
+          const byClause = parsed.facet.length > 0 ? `, by:{${parsed.facet.join(', ')}}` : '';
+          appendParts.push(
+            `  | makeTimeseries ${previousAggregations.join(', ')}, interval:${interval}${byClause}, from:-${currentWindow}, to:now()`
+          );
+        } else {
+          const byClause = parsed.facet.length > 0 ? `, by:{${parsed.facet.join(', ')}}` : '';
+          appendParts.push(`  | summarize ${previousAggregations.join(', ')}${byClause}`);
+        }
+
+        // Add time range to current query
+        renamedParts[0] = `${renamedParts[0]}, from:-${currentWindow}`;
+
+        // Combine current query with append
+        let result = renamedParts.join('\n');
+        result += '\n| append [\n';
+        result += appendParts.join('\n');
+        result += '\n]';
+
+        notes.keyDifferences.push(
+          `COMPARE WITH ${parsed.compareWith} translated using DQL append pattern with time-shifted timestamps.`
+        );
+
+        result = this.normalizeQuotes(result);
+        return result;
+      } else {
+        // Couldn't parse compare time, fall back to warning
+        warnings.push(
+          `COMPARE WITH clause could not be automatically translated. Original: COMPARE WITH ${parsed.compareWith}`
+        );
+        notes.keyDifferences.push(
+          'Use append command to overlay queries from different time periods. See docs/LESSONS_LEARNED.md for pattern.'
+        );
+      }
     }
 
     if (parsed.timezone) {
@@ -802,7 +902,6 @@ export class NRQLToDQLTranslator {
 
   /**
    * Translate aggregation function for Metric queries
-   * Note: DQL timeseries only supports: avg, sum, min, max, count, rate
    * Note: DQL timeseries only supports: avg, sum, min, max, count, rate
    */
   private translateMetricAggregation(
@@ -1362,8 +1461,9 @@ export class NRQLToDQLTranslator {
     // Deduct for warnings
     score -= warnings.length * 10;
 
-    // Deduct for unsupported features
-    if (parsed.compareWith) score -= 20;
+    // Deduct for features requiring review
+    // COMPARE WITH is now supported via append pattern, but still needs review
+    if (parsed.compareWith) score -= 5;
     if (parsed.timezone) score -= 5;
 
     // Deduct for complex queries

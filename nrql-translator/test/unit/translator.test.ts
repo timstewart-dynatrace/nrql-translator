@@ -163,10 +163,41 @@ describe('NRQLToDQLTranslator', () => {
     });
 
     it('should return lower confidence for queries with unsupported features', () => {
+      // Multiple unsupported functions to lower confidence
       const result = translator.translate(
-        'SELECT count(*) FROM Transaction COMPARE WITH 1 week ago'
+        'SELECT stddev(duration), rate(count(*), 1 minute) FROM Transaction'
       );
       expect(['medium', 'low']).toContain(result.confidence);
+    });
+  });
+
+  describe('COMPARE WITH support', () => {
+    it('should generate append pattern for COMPARE WITH', () => {
+      const result = translator.translate(
+        'SELECT count(*) FROM Transaction COMPARE WITH 1 week ago SINCE 1 day ago'
+      );
+      expect(result.dql).toContain('append');
+      expect(result.dql).toContain('current_');
+      expect(result.dql).toContain('previous_');
+      expect(result.dql).toContain('fieldsAdd timestamp');
+    });
+
+    it('should calculate correct time offsets for week comparison', () => {
+      const result = translator.translate(
+        'SELECT count(*) FROM Transaction COMPARE WITH 1 week ago SINCE 1 day ago'
+      );
+      // 1 week = 168 hours, 1 day = 24 hours
+      // Previous window should start at -(168+24)h = -192h and end at -168h
+      expect(result.dql).toContain('from:-192h');
+      expect(result.dql).toContain('to:-168h');
+      expect(result.dql).toContain('timestamp + 168h');
+    });
+
+    it('should fall back to warning for unparseable time expressions', () => {
+      const result = translator.translate(
+        'SELECT count(*) FROM Transaction COMPARE WITH last tuesday'
+      );
+      expect(result.warnings.some(w => w.includes('COMPARE WITH'))).toBe(true);
     });
   });
 

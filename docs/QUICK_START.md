@@ -92,7 +92,7 @@ Options:
 |---------|---------|
 | "Unknown function" | Function has no direct DQL equivalent |
 | "Unknown event type" | Event type not in standard mapping |
-| "COMPARE WITH not supported" | DQL lacks this feature |
+| "COMPARE WITH not supported" | Use DQL `append` command with time-shifted queries (see [LESSONS_LEARNED.md](LESSONS_LEARNED.md)) |
 
 ### Data Source Mapping
 

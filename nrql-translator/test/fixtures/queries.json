@@ -227,8 +227,8 @@
   ],
   "unsupported": [
     {
-      "name": "COMPARE WITH",
-      "nrql": "SELECT count(*) FROM Transaction COMPARE WITH 1 week ago",
+      "name": "COMPARE WITH unparseable",
+      "nrql": "SELECT count(*) FROM Transaction COMPARE WITH last tuesday",
       "shouldWarn": true,
       "expectedWarningContains": "COMPARE WITH"
     },
