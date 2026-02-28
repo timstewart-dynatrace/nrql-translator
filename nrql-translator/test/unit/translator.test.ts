@@ -392,4 +392,69 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.dql).toContain('fetch bizevents');
     });
   });
+
+  describe('NRQL comments', () => {
+    it('should strip -- line comments', () => {
+      const result = translator.translate(
+        "SELECT count(*) -- this is a comment\nFROM Log"
+      );
+      expect(result.dql).toContain('summarize');
+      expect(result.dql).toContain('count()');
+      expect(result.dql).not.toContain('comment');
+    });
+
+    it('should handle comment after SELECT with trailing fields', () => {
+      const result = translator.translate(
+        "SELECT count(*) -- correlationId, divisionNumber\nFROM Log WHERE container_name = 'my-api'"
+      );
+      expect(result.dql).toContain('summarize');
+      expect(result.dql).toContain('count()');
+      expect(result.dql).not.toContain('correlationId');
+    });
+  });
+
+  describe('Backtick-quoted fields', () => {
+    it('should strip backticks and map fields correctly', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Log WHERE `container_name` = 'my-api'"
+      );
+      expect(result.dql).toContain('container_name == "my-api"');
+      expect(result.dql).not.toContain('`');
+      expect(result.dql).not.toContain('"container_name"');
+    });
+
+    it('should handle backtick-quoted field with IN operator', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Log WHERE `level` IN ('info', 'warn')"
+      );
+      expect(result.dql).toContain('in(loglevel, array(');
+      expect(result.dql).not.toContain('`');
+    });
+  });
+
+  describe('NOT LIKE operator', () => {
+    it('should translate NOT LIKE startsWith pattern', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Log WHERE message NOT LIKE 'ADS returned%'"
+      );
+      expect(result.dql.toLowerCase()).toContain('not(startswith(content');
+      expect(result.dql).not.toContain('startsWith(NOT');
+    });
+
+    it('should translate NOT LIKE contains pattern', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Log WHERE message NOT LIKE '%error%'"
+      );
+      expect(result.dql.toLowerCase()).toContain('not(contains(content');
+    });
+
+    it('should handle multiple NOT LIKE in same query', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Log WHERE message NOT LIKE 'query:%' AND message NOT LIKE 'Calling%' AND returnedCount > 0"
+      );
+      expect(result.dql.toLowerCase()).toContain('not(startswith(content');
+      expect(result.dql).toContain('returnedCount > 0');
+      expect(result.dql).not.toContain('startsWith(NOT');
+    });
+  });
 });

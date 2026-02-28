@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.30] - 2026-02-28
+
+### Fixed
+- **NOT LIKE operator**: Fixed `NOT LIKE 'text%'` producing `startsWith(NOT, "text")` instead of `not(startsWith(field, "text"))`. NOT LIKE patterns now processed before LIKE patterns with proper function-style negation (`not(startsWith(...))`, `not(contains(...))`, `not(endsWith(...))`)
+- **Backtick-quoted field names**: Backtick identifiers (e.g., `` `container_name` ``) now stripped early in parsing so field mapping and operator conversion work correctly. Previously produced `"container_name"` (string literal) instead of `container_name` (field reference)
+- **NRQL line comments**: `--` comments now stripped during normalization. Previously, `SELECT count(*) -- comment` would include comment text in the DQL output
+- **IN operator with backtick fields**: `` `level` IN ('info') `` now correctly converts to `in(loglevel, array("info"))` instead of passing through unconverted
+
 ## [1.0.29] - 2026-02-28
 
 ### Added
