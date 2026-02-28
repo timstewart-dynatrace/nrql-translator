@@ -8,10 +8,11 @@ import {
 } from "@dynatrace/strato-components/typography";
 import { Button } from "@dynatrace/strato-components/buttons";
 import { TextArea } from "@dynatrace/strato-components-preview/forms";
+import { sendIntent } from "@dynatrace-sdk/navigation";
 import { NRQLToDQLTranslator } from "../utils/NRQLToDQLTranslator";
 import { TranslationResult } from "../utils/types";
 
-const APP_VERSION = "1.0.27";
+const APP_VERSION = "1.0.28";
 
 export const Translator = () => {
   const [nrqlQuery, setNrqlQuery] = useState("");
@@ -42,6 +43,21 @@ export const Translator = () => {
       navigator.clipboard.writeText(result.dql);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  }, [result]);
+
+  const handleOpenInNotebook = useCallback(() => {
+    if (result?.dql) {
+      sendIntent(
+        { "dt.query": result.dql },
+        { recommendedAppId: "dynatrace.notebooks", recommendedIntentId: "view-query" }
+      );
+    }
+  }, [result]);
+
+  const handleOpenWith = useCallback(() => {
+    if (result?.dql) {
+      sendIntent({ "dt.query": result.dql });
     }
   }, [result]);
 
@@ -119,9 +135,17 @@ export const Translator = () => {
                     [{result.confidence.toUpperCase()} confidence]
                   </Text>
                 </Flex>
-                <Button onClick={handleCopyDQL} variant="default">
-                  {copied ? "Copied!" : "Copy DQL"}
-                </Button>
+                <Flex alignItems="center" gap={8}>
+                  <Button onClick={handleOpenInNotebook} variant="accent">
+                    Open in Notebook
+                  </Button>
+                  <Button onClick={handleOpenWith} variant="default">
+                    Open with...
+                  </Button>
+                  <Button onClick={handleCopyDQL} variant="default">
+                    {copied ? "Copied!" : "Copy DQL"}
+                  </Button>
+                </Flex>
               </Flex>
 
               <Code>{result.dql}</Code>
