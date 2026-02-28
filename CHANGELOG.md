@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.32] - 2026-02-28
+
+### Added
+- **`filter()` aggregate function support**: `filter(count(*), WHERE cond)` decomposes to `countIf(translatedCond)`; `filter(average(field), WHERE cond)` decomposes to `avg(if(translatedCond, field))`
+- **Time grouping functions in FACET**: `hourOf(timestamp)` → `getHour(timestamp)`, `dateOf()` → `formatTimestamp()`, `weekOf()` → `getWeekOfYear()`, `monthOf()`, `dayOf()`, `yearOf()`
+- **`SLIDE BY` clause detection**: Parsed and produces a warning (DQL makeTimeseries does not support sliding windows)
+- **`ago()` time function in WHERE**: `timestamp >= ago(7 days)` translates to `timestamp >= now() - 7d`
+- 15 new tests (127 total)
+
+### Fixed
+- **CASES label parsing**: Trailing comma no longer captured as part of CASES label (e.g., `"guest,"` → `"guest"`)
+- **COMPARE WITH + CASES**: Append sub-query now correctly processes FACET fields through `processFacetFields()` instead of using raw NRQL strings. CASES expressions are properly converted to `fieldsAdd` + `if()` in both primary and append blocks
+- **COMPARE WITH + field mapping**: Append sub-query now applies field name mapping (e.g., `httpResponseCode` → `http.response.status_code`)
+- **Context propagation**: `generateTimeseries()` and `generateSummarize()` now receive translation context for proper field mapping in FACET processing
+
+### Changed
+- `SLIDE BY` added to clause stop keywords so it doesn't interfere with FACET/WHERE/COMPARE WITH parsing
+- `filter()` moved from unsupported to supported aggregation functions
+
 ## [1.0.31] - 2026-02-28
 
 ### Added

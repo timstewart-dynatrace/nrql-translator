@@ -283,6 +283,7 @@ export class NRQLToDQLTranslator {
       orderBy: this.parseOrderByClause(normalized),
       compareWith: this.parseCompareWithClause(normalized),
       timezone: this.parseTimezoneClause(normalized),
+      slideBy: this.parseSlideByClause(normalized),
     };
   }
 
@@ -306,9 +307,9 @@ export class NRQLToDQLTranslator {
 
     // Check if query starts with FROM (FROM ... SELECT pattern)
     if (/^\s*FROM\s+/i.test(nrql)) {
-      // Pattern: FROM EventType SELECT ... [WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER BY|COMPARE WITH|WITH TIMEZONE]
+      // Pattern: FROM EventType SELECT ... [WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER BY|COMPARE WITH|WITH TIMEZONE|SLIDE BY]
       const fromSelectMatch = nrql.match(
-        /FROM\s+\w+(?:\s*,\s*\w+)*\s+SELECT\s+(.*?)(?=\s+(?:WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)\s|$)/i
+        /FROM\s+\w+(?:\s*,\s*\w+)*\s+SELECT\s+(.*?)(?=\s+(?:WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE|SLIDE\s+BY)\s|$)/i
       );
       if (!fromSelectMatch) {
         throw new Error('Invalid NRQL: Missing SELECT clause after FROM');
@@ -404,7 +405,7 @@ export class NRQLToDQLTranslator {
     const aggFunctions = ['count', 'sum', 'avg', 'average', 'min', 'max', 'uniquecount',
                           'percentile', 'latest', 'earliest', 'uniques', 'median',
                           'stddev', 'rate', 'percentage', 'cdfpercentage', 'histogram',
-                          'funnel', 'apdex', 'bytecountestimate'];
+                          'funnel', 'apdex', 'bytecountestimate', 'filter'];
 
     // Check if this is an arithmetic expression containing an aggregation
     // Pattern 1: (aggFunc(field) operator value) AS alias (with outer parens)
@@ -562,7 +563,7 @@ export class NRQLToDQLTranslator {
 
     // Extract content after WHERE until next clause keyword at depth 0
     const afterWhere = afterFrom.substring(whereIdx + 5).trim(); // 5 = 'WHERE'.length
-    const stopKeywords = ['FACET', 'TIMESERIES', 'SINCE', 'UNTIL', 'LIMIT', 'ORDER BY', 'COMPARE WITH', 'WITH TIMEZONE'];
+    const stopKeywords = ['FACET', 'TIMESERIES', 'SINCE', 'UNTIL', 'LIMIT', 'ORDER BY', 'COMPARE WITH', 'WITH TIMEZONE', 'SLIDE BY'];
     const content = this.extractUntilClauseKeyword(afterWhere, stopKeywords);
 
     return content || null;
@@ -580,7 +581,7 @@ export class NRQLToDQLTranslator {
 
     // Extract content after FACET until next clause keyword at depth 0
     const afterFacet = nrql.substring(facetIdx + 5).trim(); // 5 = 'FACET'.length
-    const stopKeywords = ['WHERE', 'TIMESERIES', 'SINCE', 'UNTIL', 'LIMIT', 'ORDER BY', 'COMPARE WITH', 'WITH TIMEZONE'];
+    const stopKeywords = ['WHERE', 'TIMESERIES', 'SINCE', 'UNTIL', 'LIMIT', 'ORDER BY', 'COMPARE WITH', 'WITH TIMEZONE', 'SLIDE BY'];
     const content = this.extractUntilClauseKeyword(afterFacet, stopKeywords);
 
     if (!content) return [];
@@ -680,7 +681,7 @@ export class NRQLToDQLTranslator {
    * Parse COMPARE WITH clause
    */
   private parseCompareWithClause(nrql: string): string | null {
-    const compareMatch = nrql.match(/COMPARE\s+WITH\s+(.*?)(?=\s+WITH\s+TIMEZONE|$)/i);
+    const compareMatch = nrql.match(/COMPARE\s+WITH\s+(.*?)(?=\s+(?:WITH\s+TIMEZONE|SLIDE\s+BY|TIMESERIES)\s|$)/i);
     return compareMatch ? compareMatch[1].trim() : null;
   }
 
@@ -690,6 +691,15 @@ export class NRQLToDQLTranslator {
   private parseTimezoneClause(nrql: string): string | null {
     const tzMatch = nrql.match(/WITH\s+TIMEZONE\s+['"]?(.+?)['"]?$/i);
     return tzMatch ? tzMatch[1].trim() : null;
+  }
+
+  /**
+   * Parse SLIDE BY clause
+   * SLIDE BY creates overlapping time windows (not supported in DQL)
+   */
+  private parseSlideByClause(nrql: string): string | null {
+    const slideMatch = nrql.match(/SLIDE\s+BY\s+(\d+\s+\w+)/i);
+    return slideMatch ? slideMatch[1].trim() : null;
   }
 
   // ==========================================================================
@@ -730,6 +740,7 @@ export class NRQLToDQLTranslator {
         parsed.select,
         parsed.facet,
         parsed.timeseries,
+        context,
         warnings,
         notes
       );
@@ -739,6 +750,7 @@ export class NRQLToDQLTranslator {
       const summarizeCmd = this.generateSummarize(
         parsed.select,
         parsed.facet,
+        context,
         warnings,
         notes
       );
@@ -804,16 +816,29 @@ export class NRQLToDQLTranslator {
         }
         appendParts.push(`  | fieldsAdd timestamp = timestamp + ${compareOffsetHours}h`);
 
+        // Process FACET fields for append block (handles CASES, field mapping)
+        let appendByClause = '';
+        if (parsed.facet.length > 0) {
+          const { facetFields, fieldsAddCmds } = this.processFacetFields(
+            parsed.facet, context, warnings, notes
+          );
+          // Insert fieldsAdd commands before the aggregation
+          for (const cmd of fieldsAddCmds) {
+            appendParts.push(`  ${cmd}`);
+          }
+          if (facetFields.length > 0) {
+            appendByClause = `, by:{${facetFields.join(', ')}}`;
+          }
+        }
+
         if (parsed.timeseries) {
           const dqlUnit = NRQLToDQLTranslator.TIME_UNIT_MAP[parsed.timeseries.unit] ?? 'm';
           const interval = `${parsed.timeseries.value}${dqlUnit}`;
-          const byClause = parsed.facet.length > 0 ? `, by:{${parsed.facet.join(', ')}}` : '';
           appendParts.push(
-            `  | makeTimeseries ${previousAggregations.join(', ')}, interval:${interval}${byClause}, from:-${currentWindow}, to:now()`
+            `  | makeTimeseries ${previousAggregations.join(', ')}, interval:${interval}${appendByClause}, from:-${currentWindow}, to:now()`
           );
         } else {
-          const byClause = parsed.facet.length > 0 ? `, by:{${parsed.facet.join(', ')}}` : '';
-          appendParts.push(`  | summarize ${previousAggregations.join(', ')}${byClause}`);
+          appendParts.push(`  | summarize ${previousAggregations.join(', ')}${appendByClause}`);
         }
 
         // Add time range to current query
@@ -840,6 +865,12 @@ export class NRQLToDQLTranslator {
           'Use append command to overlay queries from different time periods. See docs/LESSONS_LEARNED.md for pattern.'
         );
       }
+    }
+
+    if (parsed.slideBy) {
+      warnings.push(
+        `SLIDE BY ${parsed.slideBy} is not supported in DQL makeTimeseries. The query uses non-overlapping intervals instead.`
+      );
     }
 
     if (parsed.timezone) {
@@ -1121,6 +1152,14 @@ export class NRQLToDQLTranslator {
   ): string {
     let result = where;
 
+    // Convert ago() time function: ago(7 days) → now() - 7d
+    result = result.replace(/\bago\s*\(\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks)\s*\)/gi,
+      (_match, value, unit) => {
+        const dqlUnit = NRQLToDQLTranslator.TIME_UNIT_MAP[unit.toLowerCase()] ?? 'h';
+        return `now() - ${value}${dqlUnit}`;
+      }
+    );
+
     // Map field names
     result = this.mapFieldNames(result, context);
 
@@ -1370,6 +1409,7 @@ export class NRQLToDQLTranslator {
   private generateSummarize(
     select: SelectClause,
     facet: string[],
+    context: TranslationContext | undefined,
     warnings: string[],
     notes: TranslationNotes
   ): string {
@@ -1391,7 +1431,7 @@ export class NRQLToDQLTranslator {
 
     // Process FACET fields (handles CASES(), if(), and regular fields)
     if (facet.length > 0) {
-      const { facetFields, fieldsAddCmds } = this.processFacetFields(facet, undefined, warnings, notes);
+      const { facetFields, fieldsAddCmds } = this.processFacetFields(facet, context, warnings, notes);
 
       // Add fieldsAdd commands before summarize
       if (fieldsAddCmds.length > 0) {
@@ -1466,6 +1506,11 @@ export class NRQLToDQLTranslator {
     // Handle cdfPercentage() expansion: cdfPercentage(field, t1, t2, ...) → multiple countIf expressions
     if (funcName === 'cdfpercentage') {
       return this.translateCdfPercentageFunction(agg, warnings, notes);
+    }
+
+    // Handle filter() decomposition: filter(aggregate, WHERE condition) → conditional aggregation
+    if (funcName === 'filter') {
+      return this.translateFilterFunction(agg, warnings, notes);
     }
 
     // Check for unsupported functions
@@ -1617,12 +1662,71 @@ export class NRQLToDQLTranslator {
   }
 
   /**
+   * Translate NRQL filter() aggregate function
+   * filter(count(*), WHERE error IS TRUE) → countIf(error == true)
+   * filter(average(duration), WHERE appName LIKE '%api%') → avg(if(contains(service.name, "api"), duration))
+   */
+  private translateFilterFunction(
+    agg: AggregationFunction,
+    warnings: string[],
+    notes: TranslationNotes
+  ): string | null {
+    const alias = agg.alias ?? 'filtered';
+
+    // The raw args string contains: "innerAgg, WHERE condition"
+    // We need to split carefully on the WHERE keyword at depth 0
+    const rawArgs = agg.args.join(', ');
+
+    // Find WHERE at depth 0
+    const whereIdx = this.findClauseKeyword(rawArgs, 'WHERE');
+    if (whereIdx === -1) {
+      warnings.push(`filter() requires a WHERE condition: filter(${rawArgs})`);
+      return null;
+    }
+
+    const innerAggStr = rawArgs.substring(0, whereIdx).trim().replace(/,\s*$/, '');
+    const condition = rawArgs.substring(whereIdx + 5).trim(); // 5 = 'WHERE'.length
+
+    // Translate the WHERE condition
+    const translatedCondition = this.translateWhereConditions(condition, undefined, warnings, notes);
+
+    // Parse the inner aggregation
+    const innerAgg = this.parseAggregationFunction(innerAggStr);
+    if (!innerAgg) {
+      warnings.push(`Could not parse inner aggregation in filter(): ${innerAggStr}`);
+      return null;
+    }
+
+    const innerFuncName = innerAgg.name.toLowerCase();
+
+    // For count(*) → use countIf(condition)
+    if (innerFuncName === 'count' && (innerAgg.args.length === 0 || innerAgg.args[0] === '*')) {
+      notes.keyDifferences.push(
+        `filter(count(*), WHERE ${condition}) decomposed to countIf(${translatedCondition})`
+      );
+      return `${alias} = countIf(${translatedCondition})`;
+    }
+
+    // For other aggregations like average(field) → avg(if(condition, field))
+    const dqlFuncName = NRQLToDQLTranslator.FUNCTION_MAP[innerFuncName]?.dql ?? innerFuncName;
+    const field = innerAgg.args[0] ?? '*';
+    const mappedField = this.mapFieldNames(field, undefined);
+
+    notes.keyDifferences.push(
+      `filter(${innerFuncName}(${field}), WHERE ${condition}) decomposed to ${dqlFuncName}(if(condition, field))`
+    );
+
+    return `${alias} = ${dqlFuncName}(if(${translatedCondition}, ${mappedField}))`;
+  }
+
+  /**
    * Generate makeTimeseries command for time series queries
    */
   private generateTimeseries(
     select: SelectClause,
     facet: string[],
     timeseries: TimeseriesClause,
+    context: TranslationContext | undefined,
     warnings: string[],
     notes: TranslationNotes
   ): string {
@@ -1647,7 +1751,7 @@ export class NRQLToDQLTranslator {
 
     // Process FACET fields (handles CASES(), if(), and regular fields)
     if (facet.length > 0) {
-      const { facetFields, fieldsAddCmds } = this.processFacetFields(facet, undefined, warnings, notes);
+      const { facetFields, fieldsAddCmds } = this.processFacetFields(facet, context, warnings, notes);
 
       // Add fieldsAdd commands before makeTimeseries
       if (fieldsAddCmds.length > 0) {
@@ -1833,6 +1937,30 @@ export class NRQLToDQLTranslator {
         continue;
       }
 
+      // Check for NRQL time grouping functions: hourOf(), dateOf(), weekOf(), monthOf()
+      const timeGroupMatch = trimmed.match(/^(hourOf|dateOf|weekOf|monthOf|dayOf|yearOf)\s*\((.+)\)$/i);
+      if (timeGroupMatch) {
+        const funcName = timeGroupMatch[1].toLowerCase();
+        const field = this.mapFieldNames(timeGroupMatch[2].trim(), context);
+        const timeGroupMap: Record<string, { dql: string; alias: string }> = {
+          'hourof': { dql: `getHour(${field})`, alias: 'hour' },
+          'dateof': { dql: `formatTimestamp(${field}, format:"yyyy-MM-dd")`, alias: 'date' },
+          'weekof': { dql: `getWeekOfYear(${field})`, alias: 'week' },
+          'monthof': { dql: `getMonth(${field})`, alias: 'month' },
+          'dayof': { dql: `getDayOfWeek(${field})`, alias: 'day_of_week' },
+          'yearof': { dql: `getYear(${field})`, alias: 'year' },
+        };
+        const mapping = timeGroupMap[funcName];
+        if (mapping) {
+          fieldsAddCmds.push(`| fieldsAdd ${mapping.alias} = ${mapping.dql}`);
+          facetFields.push(mapping.alias);
+          notes.keyDifferences.push(
+            `NRQL ${timeGroupMatch[1]}() converted to DQL ${mapping.dql} via fieldsAdd`
+          );
+          continue;
+        }
+      }
+
       // Regular field — apply field mapping
       facetFields.push(this.mapFieldNames(trimmed, context));
     }
@@ -1857,7 +1985,7 @@ export class NRQLToDQLTranslator {
     const parts = casesContent.split(/\bwhere\b/i).filter(p => p.trim());
 
     for (const part of parts) {
-      const asMatch = part.match(/^(.*?)\s+AS\s+['"]?([^'"]+)['"]?\s*,?\s*$/i);
+      const asMatch = part.match(/^(.*?)\s+AS\s+['"]?([^'"]+?)['"]?\s*,?\s*$/i);
       if (asMatch) {
         caseEntries.push({
           condition: asMatch[1].trim(),

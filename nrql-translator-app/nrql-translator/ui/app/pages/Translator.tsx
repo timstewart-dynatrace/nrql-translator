@@ -14,7 +14,7 @@ import { sendIntent } from "@dynatrace-sdk/navigation";
 import { NRQLToDQLTranslator } from "../utils/NRQLToDQLTranslator";
 import { TranslationResult } from "../utils/types";
 
-const APP_VERSION = "1.0.31";
+const APP_VERSION = "1.0.32";
 
 export const Translator = () => {
   const [nrqlQuery, setNrqlQuery] = useState("");
@@ -113,11 +113,11 @@ export const Translator = () => {
           <Flex flexDirection="column" gap={8}>
             <Text style={{ fontWeight: "bold" }}>Supported NRQL features</Text>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
-              <li><Text>SELECT with aggregation functions (count, average, sum, min, max, percentile, uniqueCount, latest, earliest, stddev, median, rate, percentage, cdfPercentage)</Text></li>
+              <li><Text>SELECT with aggregation functions (count, average, sum, min, max, percentile, uniqueCount, latest, earliest, stddev, median, rate, percentage, cdfPercentage, filter)</Text></li>
               <li><Text>FROM with event type mapping (Transaction, Span, Log, Metric, PageView, and more)</Text></li>
-              <li><Text>WHERE clause with operators (=, !=, &gt;, &lt;, LIKE, IN, IS NULL, AND, OR)</Text></li>
-              <li><Text>FACET for grouping, TIMESERIES for time-based charts</Text></li>
-              <li><Text>ORDER BY, LIMIT, LIMIT MAX, COMPARE WITH, CASES, and aliases (AS)</Text></li>
+              <li><Text>WHERE clause with operators (=, !=, &gt;, &lt;, LIKE, IN, IS NULL, AND, OR, ago())</Text></li>
+              <li><Text>FACET for grouping with CASES, hourOf, dateOf, weekOf; TIMESERIES for time-based charts</Text></li>
+              <li><Text>ORDER BY, LIMIT, LIMIT MAX, COMPARE WITH, CASES, SLIDE BY (warning), and aliases (AS)</Text></li>
             </ul>
           </Flex>
 
