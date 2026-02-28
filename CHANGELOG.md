@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.29] - 2026-02-28
+
+### Added
+- **Help dialog**: Help button in top-right corner opens a modal with usage instructions, supported NRQL features, confidence level explanations, version number, and community disclaimer
+- Uses Strato `Modal` component and `HelpIcon` for native Dynatrace look and feel
+
 ## [1.0.28] - 2026-02-28
 
 ### Added
