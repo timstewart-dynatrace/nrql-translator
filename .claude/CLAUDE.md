@@ -79,7 +79,7 @@ npx jest --verbose                                 # see all test names
 4. `.claude/CLAUDE.md` → version below
 5. `CHANGELOG.md` → new entry (Keep a Changelog format)
 
-Current version: **1.0.33**
+Current version: **1.0.34**
 
 ## Workflow
 

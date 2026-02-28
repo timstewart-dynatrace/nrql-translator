@@ -165,6 +165,100 @@ export class NRQLToDQLTranslator {
     },
   };
 
+  /** Confidence score threshold for 'high' confidence */
+  private static readonly CONFIDENCE_HIGH_THRESHOLD = 80;
+  /** Confidence score threshold for 'medium' confidence */
+  private static readonly CONFIDENCE_MEDIUM_THRESHOLD = 50;
+
+  /**
+   * Standard field name mappings from NRQL to DQL.
+   * Order matters: more specific mappings (with dots) come first.
+   */
+  private static readonly FIELD_MAP: Record<string, string> = {
+    // Dotted fields first (more specific)
+    'service.name': 'service.name',
+    'span.kind': 'span.kind',
+    'entity.name': 'dt.entity.name',
+    'entity.guid': 'entity.guid',
+    'http.method': 'http.request.method',
+    'http.url': 'http.request.url',
+    'http.target': 'http.target',
+    'http.statusCode': 'http.response.status_code',
+    'http.status_code': 'http.response.status_code',
+    'error.class': 'error.type',
+    'error.message': 'error.message',
+    'log.message': 'content',
+    'log.level': 'loglevel',
+    'request.uri': 'http.route',
+    'request.method': 'http.request.method',
+    'response.status': 'http.response.status_code',
+    'parent.id': 'span.parent_id',
+    'trace.id': 'trace_id',
+    'db.name': 'db.name',
+    'db.system': 'db.system',
+    'db.statement': 'db.statement',
+    'server.address': 'server.address',
+    'db.namespace': 'db.namespace',
+    // Simple fields (less specific)
+    'timestamp': 'timestamp',
+    'duration': 'duration',
+    'totalTime': 'response_time',
+    'webDuration': 'response_time',
+    'databaseDuration': 'db.response_time',
+    'externalDuration': 'external.response_time',
+    'transactionName': 'span.name',
+    'host': 'host.name',
+    'hostname': 'host.name',
+    'appName': 'service.name',
+    'appId': 'dt.entity.service',
+    'entityGuid': 'dt.entity.service',
+    'errorMessage': 'error.message',
+    'errorType': 'error.type',
+    'httpResponseCode': 'http.response.status_code',
+    'cpuPercent': 'host.cpu.usage',
+    'memoryUsedPercent': 'host.mem.usage',
+    'memoryUsedBytes': 'host.mem.used',
+    'diskUsedPercent': 'host.disk.usage',
+    'message': 'content',
+    'level': 'loglevel',
+    'severity': 'loglevel',
+    // Kubernetes fields
+    'k8s.clusterName': 'k8s.cluster.name',
+    'k8s.containerName': 'k8s.container.name',
+    'k8s.podName': 'k8s.pod.name',
+    'k8s.namespaceName': 'k8s.namespace.name',
+    'k8s.nodeName': 'k8s.node.name',
+    'k8s.deploymentName': 'k8s.deployment.name',
+    'k8s.daemonSetName': 'k8s.daemonset.name',
+    'k8s.replicaSetName': 'k8s.replicaset.name',
+    'k8s.statefulSetName': 'k8s.statefulset.name',
+    'k8s.containerId': 'k8s.container.id',
+    'k8s.podId': 'k8s.pod.uid',
+    'k8s.namespaceId': 'k8s.namespace.uid',
+    'clusterName': 'k8s.cluster.name',
+    'containerName': 'k8s.container.name',
+    'podName': 'k8s.pod.name',
+    'namespaceName': 'k8s.namespace.name',
+    'nodeName': 'k8s.node.name',
+    // Kubernetes container metrics
+    'k8s.container.cpuUsedCores': 'dt.kubernetes.container.cpu_usage',
+    'k8s.container.memoryUsedBytes': 'dt.kubernetes.container.memory_usage',
+    'k8s.container.restartCount': 'dt.kubernetes.container.restarts',
+    // Browser/RUM fields
+    'requestUrl': 'http.request.url',
+    'jobName': 'k8s.job.name',
+  };
+
+  /**
+   * Known aggregation function names for detection in expressions
+   */
+  private static readonly AGG_FUNCTIONS = [
+    'count', 'sum', 'avg', 'average', 'min', 'max', 'uniquecount',
+    'percentile', 'latest', 'earliest', 'uniques', 'median',
+    'stddev', 'rate', 'percentage', 'cdfpercentage', 'histogram',
+    'funnel', 'apdex', 'bytecountestimate', 'filter',
+  ];
+
   /**
    * Time unit conversion map (NRQL to DQL)
    */
@@ -402,11 +496,7 @@ export class NRQLToDQLTranslator {
    * Handles arithmetic expressions (e.g., (max(field)/1000) as alias)
    */
   private parseAggregationFunction(part: string): AggregationFunction | null {
-    // List of known aggregation functions
-    const aggFunctions = ['count', 'sum', 'avg', 'average', 'min', 'max', 'uniquecount',
-                          'percentile', 'latest', 'earliest', 'uniques', 'median',
-                          'stddev', 'rate', 'percentage', 'cdfpercentage', 'histogram',
-                          'funnel', 'apdex', 'bytecountestimate', 'filter'];
+    const aggFunctions = NRQLToDQLTranslator.AGG_FUNCTIONS;
 
     // Check if this is an arithmetic expression containing an aggregation
     // Pattern 1: (expr) [OP value] [AS alias] (with outer parens)
@@ -461,7 +551,7 @@ export class NRQLToDQLTranslator {
     // Pattern 2: aggFunc(field) operator value AS alias (without outer parens)
     // e.g., average(duration.ms)/1000, max(bytes)*100 AS scaled
     const arithmeticNoParensMatch = part.match(
-      /^(\w+)\s*\(([^)]+)\)\s*([+\-*\/])\s*(\d+(?:\.\d+)?)\s*(?:AS\s+['"]?(.+?)['"]?)?$/i
+      /^(\w+)\s*\(([^)]+)\)\s*([+\-*/])\s*(\d+(?:\.\d+)?)\s*(?:AS\s+['"]?(.+?)['"]?)?$/i
     );
     if (arithmeticNoParensMatch) {
       const [, funcName, funcArgs, operator, operand, alias] = arithmeticNoParensMatch;
@@ -514,7 +604,7 @@ export class NRQLToDQLTranslator {
       alias = aliasMatch[1].replace(/['"]/g, '');
     } else if (afterFunc.length > 0 && !afterFunc.match(/^AS\s/i)) {
       // Content after function isn't an alias — check for arithmetic operator
-      const opMatch = afterFunc.match(/^[+\-*\/]/);
+      const opMatch = afterFunc.match(/^[+\-*/]/);
       if (opMatch) {
         // Arithmetic expression: func(...) OP rest [AS alias]
         let arithmeticAlias: string | null = null;
@@ -550,35 +640,11 @@ export class NRQLToDQLTranslator {
   }
 
   /**
-   * Split function arguments by comma, respecting nested parentheses
+   * Split function arguments by comma, respecting nested parentheses.
+   * Delegates to splitSelectParts which has identical logic.
    */
   private splitArgsRespectingParens(argsStr: string): string[] {
-    const args: string[] = [];
-    let current = '';
-    let depth = 0;
-
-    for (const char of argsStr) {
-      if (char === '(') {
-        depth++;
-        current += char;
-      } else if (char === ')') {
-        depth--;
-        current += char;
-      } else if (char === ',' && depth === 0) {
-        if (current.trim()) {
-          args.push(current.trim());
-        }
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-
-    if (current.trim()) {
-      args.push(current.trim());
-    }
-
-    return args;
+    return this.splitSelectParts(argsStr);
   }
 
   /**
@@ -1236,84 +1302,7 @@ export class NRQLToDQLTranslator {
       }
     }
 
-    // Standard field mappings (expanded from reference project)
-    // Note: Order matters - more specific mappings (with dots) should come first
-    const standardMappings: Record<string, string> = {
-      // Dotted fields first (more specific)
-      'service.name': 'service.name',  // preserve as-is
-      'span.kind': 'span.kind',        // preserve as-is
-      'entity.name': 'dt.entity.name',
-      'entity.guid': 'entity.guid',    // preserve for filtering
-      'http.method': 'http.request.method',
-      'http.url': 'http.request.url',
-      'http.target': 'http.target',    // preserve as-is
-      'http.statusCode': 'http.response.status_code',
-      'http.status_code': 'http.response.status_code',
-      'error.class': 'error.type',
-      'error.message': 'error.message',
-      'log.message': 'content',
-      'log.level': 'loglevel',
-      'request.uri': 'http.route',
-      'request.method': 'http.request.method',
-      'response.status': 'http.response.status_code',
-      'parent.id': 'span.parent_id',
-      'trace.id': 'trace_id',
-      'db.name': 'db.name',           // preserve as-is
-      'db.system': 'db.system',       // preserve as-is
-      'db.statement': 'db.statement', // preserve as-is
-      'server.address': 'server.address', // preserve as-is
-      'db.namespace': 'db.namespace',     // preserve as-is
-      // Simple fields (less specific) - use negative lookbehind for dot
-      'timestamp': 'timestamp',
-      'duration': 'duration',
-      'totalTime': 'response_time',
-      'webDuration': 'response_time',
-      'databaseDuration': 'db.response_time',
-      'externalDuration': 'external.response_time',
-      'transactionName': 'span.name',
-      'host': 'host.name',
-      'hostname': 'host.name',
-      'appName': 'service.name',
-      'appId': 'dt.entity.service',
-      'entityGuid': 'dt.entity.service',
-      'errorMessage': 'error.message',
-      'errorType': 'error.type',
-      'httpResponseCode': 'http.response.status_code',
-      'cpuPercent': 'host.cpu.usage',
-      'memoryUsedPercent': 'host.mem.usage',
-      'memoryUsedBytes': 'host.mem.used',
-      'diskUsedPercent': 'host.disk.usage',
-      'message': 'content',
-      'level': 'loglevel',
-      'severity': 'loglevel',
-      // Kubernetes fields - New Relic uses different naming than Dynatrace
-      'k8s.clusterName': 'k8s.cluster.name',
-      'k8s.containerName': 'k8s.container.name',
-      'k8s.podName': 'k8s.pod.name',
-      'k8s.namespaceName': 'k8s.namespace.name',
-      'k8s.nodeName': 'k8s.node.name',
-      'k8s.deploymentName': 'k8s.deployment.name',
-      'k8s.daemonSetName': 'k8s.daemonset.name',
-      'k8s.replicaSetName': 'k8s.replicaset.name',
-      'k8s.statefulSetName': 'k8s.statefulset.name',
-      'k8s.containerId': 'k8s.container.id',
-      'k8s.podId': 'k8s.pod.uid',
-      'k8s.namespaceId': 'k8s.namespace.uid',
-      'clusterName': 'k8s.cluster.name',
-      'containerName': 'k8s.container.name',
-      'podName': 'k8s.pod.name',
-      'namespaceName': 'k8s.namespace.name',
-      'nodeName': 'k8s.node.name',
-      // Kubernetes container metrics
-      'k8s.container.cpuUsedCores': 'dt.kubernetes.container.cpu_usage',
-      'k8s.container.memoryUsedBytes': 'dt.kubernetes.container.memory_usage',
-      'k8s.container.restartCount': 'dt.kubernetes.container.restarts',
-      // Browser/RUM fields
-      'requestUrl': 'http.request.url',
-      'jobName': 'k8s.job.name',
-    };
-
-    for (const [nrField, dtField] of Object.entries(standardMappings)) {
+    for (const [nrField, dtField] of Object.entries(NRQLToDQLTranslator.FIELD_MAP)) {
       // Use negative lookbehind for dot to avoid matching "name" in "service.name"
       const regex = new RegExp(`(?<!\\.)\\b${this.escapeRegex(nrField)}\\b`, 'g');
       result = result.replace(regex, dtField);
@@ -1864,8 +1853,8 @@ export class NRQLToDQLTranslator {
     }
 
     // Determine confidence level
-    if (score >= 80) return 'high';
-    if (score >= 50) return 'medium';
+    if (score >= NRQLToDQLTranslator.CONFIDENCE_HIGH_THRESHOLD) return 'high';
+    if (score >= NRQLToDQLTranslator.CONFIDENCE_MEDIUM_THRESHOLD) return 'medium';
     return 'low';
   }
 
@@ -2086,10 +2075,7 @@ export class NRQLToDQLTranslator {
     warnings: string[],
     notes: TranslationNotes
   ): string {
-    const aggFunctions = ['count', 'sum', 'avg', 'average', 'min', 'max', 'uniquecount',
-                          'percentile', 'latest', 'earliest', 'uniques', 'median',
-                          'stddev', 'rate', 'percentage', 'cdfpercentage', 'histogram',
-                          'funnel', 'apdex', 'bytecountestimate', 'filter'];
+    const aggFunctions = NRQLToDQLTranslator.AGG_FUNCTIONS;
 
     let result = '';
     let i = 0;
