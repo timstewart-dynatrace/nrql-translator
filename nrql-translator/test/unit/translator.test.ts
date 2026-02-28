@@ -140,6 +140,151 @@ describe('NRQLToDQLTranslator', () => {
     }
   });
 
+  describe('rate() function', () => {
+    for (const testCase of fixtures.rateFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should decompose rate(count(*), 1 minute) to count()', () => {
+      const result = translator.translate(
+        "SELECT rate(count(*), 1 minute) FROM Transaction"
+      );
+      expect(result.dql).toContain('count()');
+      expect(result.notes.keyDifferences.some(n => n.includes('rate('))).toBe(true);
+    });
+
+    it('should produce high confidence for rate queries', () => {
+      const result = translator.translate(
+        "SELECT rate(count(*), 1 minute) FROM Span FACET http.status_code TIMESERIES"
+      );
+      expect(result.confidence).toBe('high');
+    });
+  });
+
+  describe('percentage() function', () => {
+    for (const testCase of fixtures.percentageFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should decompose percentage to countIf/count', () => {
+      const result = translator.translate(
+        "SELECT percentage(count(*), WHERE status = 200) FROM Transaction"
+      );
+      expect(result.dql).toContain('countIf(');
+      expect(result.dql).toContain('count()');
+      expect(result.dql).toContain('100.0');
+    });
+
+    it('should translate WHERE condition inside percentage()', () => {
+      const result = translator.translate(
+        "SELECT percentage(count(http.status_code), where http.status_code > 199 and http.status_code < 300) as '2XX' from Span"
+      );
+      expect(result.dql).toContain('2XX');
+      expect(result.dql).toContain('countIf(');
+      // Operators should be translated
+      expect(result.dql).toContain('http.response.status_code');
+    });
+  });
+
+  describe('cdfPercentage() function', () => {
+    for (const testCase of fixtures.cdfPercentageFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should expand cdfPercentage to multiple countIf expressions', () => {
+      const result = translator.translate(
+        "SELECT cdfPercentage(duration.ms, 1000, 2000, 3000) FROM Span"
+      );
+      expect(result.dql).toContain('countIf(duration.ms <= 1000)');
+      expect(result.dql).toContain('countIf(duration.ms <= 2000)');
+      expect(result.dql).toContain('countIf(duration.ms <= 3000)');
+      expect(result.dql).toContain('100.0');
+    });
+
+    it('should produce meaningful aliases for each threshold', () => {
+      const result = translator.translate(
+        "SELECT cdfPercentage(duration.ms, 500, 1000) FROM Span"
+      );
+      expect(result.dql).toContain('pct_le_500');
+      expect(result.dql).toContain('pct_le_1000');
+    });
+  });
+
+  describe('LIMIT MAX', () => {
+    for (const testCase of fixtures.limitMax) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should not produce limit clause for LIMIT MAX', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Span FACET host LIMIT MAX"
+      );
+      expect(result.dql).not.toContain('limit');
+    });
+
+    it('should still handle numeric LIMIT', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Span FACET host LIMIT 10"
+      );
+      expect(result.dql).toContain('limit 10');
+    });
+  });
+
+  describe('CASES() in FACET', () => {
+    for (const testCase of fixtures.casesFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should convert CASES to fieldsAdd with if() expression', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Span FACET CASES(where status = 200 AS success, where status != 200 AS failure)"
+      );
+      expect(result.dql).toContain('fieldsAdd');
+      expect(result.dql).toContain('if(');
+      expect(result.dql).toContain('case_result');
+    });
+  });
+
   describe('TranslationResult structure', () => {
     it('should return complete TranslationResult', () => {
       const result = translator.translate('SELECT count(*) FROM Transaction');
@@ -165,7 +310,7 @@ describe('NRQLToDQLTranslator', () => {
     it('should return lower confidence for queries with unsupported features', () => {
       // Multiple unsupported functions to lower confidence
       const result = translator.translate(
-        'SELECT rate(count(*), 1 minute), histogram(duration, 100, 10) FROM Transaction'
+        'SELECT histogram(duration, 100, 10), funnel(session, WHERE step1, WHERE step2) FROM Transaction'
       );
       expect(['medium', 'low']).toContain(result.confidence);
     });
@@ -252,7 +397,6 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host"
       );
-      // Metric queries use timeseries command with avg() since DQL timeseries doesn't support takeLast()
       expect(result.dql).toContain('timeseries');
       expect(result.dql).toContain('avg(cpuUsage)');
       expect(result.dql).toContain('by:{');
@@ -271,7 +415,6 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(cpuUsage) FACET host TIMESERIES"
       );
-      // Metric queries use timeseries command
       expect(result.dql).toContain('timeseries');
       expect(result.dql).toContain('by:{');
     });
@@ -295,7 +438,6 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.dql).toContain('makeTimeseries');
       expect(result.dql).toContain('by:{');
       expect(result.dql).toContain('service.name');
-      // Make sure WHERE clause content isn't in the by:{} clause
       expect(result.dql).not.toContain('by:{host.name WHERE');
     });
 
@@ -303,7 +445,6 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Transaction SELECT count(*) FACET host WHERE appName = 'MyApp' TIMESERIES"
       );
-      // Make sure TIMESERIES keyword doesn't appear in DQL output (it becomes makeTimeseries)
       expect(result.dql).not.toContain('TIMESERIES');
       expect(result.dql).toContain('makeTimeseries');
       expect(result.dql).toContain('service.name');
@@ -316,7 +457,6 @@ describe('NRQLToDQLTranslator', () => {
         "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host WHERE appName = 'MyApp'"
       );
       expect(result.dql).toContain('timeseries');
-      // DQL timeseries only supports avg, sum, min, max, count, rate - latest() maps to avg() since takeLast() is not available in timeseries
       expect(result.dql).toContain('CPUUsage = avg(cpuUsage)');
       expect(result.dql).toContain('by:{');
       expect(result.dql).toContain('filter');
@@ -336,11 +476,8 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(`k8s.container.cpuUsedCores`) as CPUUsage FACET `k8s.containerName`"
       );
-      // Metric keys and facet fields should NOT be quoted in DQL timeseries
       expect(result.dql).toContain('avg(k8s.container.cpuUsedCores)');
-      // k8s.containerName should be mapped to k8s.container.name in by:{} clause
       expect(result.dql).toContain('by:{k8s.container.name}');
-      // Should NOT contain quoted versions
       expect(result.dql).not.toContain('"k8s.container.cpuUsedCores"');
       expect(result.dql).not.toContain('"k8s.container.name"');
     });
@@ -349,10 +486,9 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(cpuUsage) as CPU FACET host WHERE clusterName = 'prod'"
       );
-      // WHERE field should be automatically added to by:{} clause
       expect(result.dql).toContain('by:{');
       expect(result.dql).toContain('host');
-      expect(result.dql).toContain('k8s.cluster.name'); // clusterName mapped to k8s.cluster.name
+      expect(result.dql).toContain('k8s.cluster.name');
       expect(result.dql).toContain('filter');
     });
 
@@ -360,12 +496,10 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(k8s.container.cpuUsedCores) as CPUUsage FACET k8s.containerName, k8s.containerId WHERE k8s.containerName = 'my-container' AND k8s.clusterName = 'my-cluster'"
       );
-      // Both FACET and WHERE k8s fields should be mapped in by:{} clause
       expect(result.dql).toContain('by:{');
-      expect(result.dql).toContain('k8s.container.name'); // k8s.containerName mapped
-      expect(result.dql).toContain('k8s.container.id'); // k8s.containerId mapped
-      expect(result.dql).toContain('k8s.cluster.name'); // k8s.clusterName mapped
-      // Unmapped versions should NOT appear in by:{} clause
+      expect(result.dql).toContain('k8s.container.name');
+      expect(result.dql).toContain('k8s.container.id');
+      expect(result.dql).toContain('k8s.cluster.name');
       expect(result.dql).not.toMatch(/by:\{[^}]*k8s\.containerName[^}]*\}/);
       expect(result.dql).not.toMatch(/by:\{[^}]*k8s\.containerId[^}]*\}/);
       expect(result.dql).not.toMatch(/by:\{[^}]*k8s\.clusterName[^}]*\}/);
@@ -455,6 +589,35 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.dql.toLowerCase()).toContain('not(startswith(content');
       expect(result.dql).toContain('returnedCount > 0');
       expect(result.dql).not.toContain('startsWith(NOT');
+    });
+  });
+
+  describe('Real-world production queries', () => {
+    it('should translate percentage HTTP status code query', () => {
+      const result = translator.translate(
+        "SELECT percentage(count(http.status_code), where http.status_code > 199 and http.status_code < 300) as '2XX', percentage(count(http.status_code), where http.status_code > 399 and http.status_code < 500) as '4XX', percentage(count(http.status_code), where http.status_code > 499 and http.status_code < 600) as '5XX' from Span where service.name = 'prod-usf-auth-api' and span.kind = 'server' and net.protocol.name = 'http' TIMESERIES auto"
+      );
+      expect(result.dql).toContain('makeTimeseries');
+      expect(result.dql).toContain('2XX');
+      expect(result.dql).toContain('4XX');
+      expect(result.dql).toContain('5XX');
+      expect(result.dql).toContain('countIf(');
+    });
+
+    it('should translate rate with COMPARE WITH', () => {
+      const result = translator.translate(
+        "SELECT rate(count(*), 1 minute) AS 'Typeahead Rate' FROM Span WHERE (http.route = '/product-domain-api/v1/typeahead') AND ((span.kind LIKE 'server' OR span.kind LIKE 'consumer' OR kind LIKE 'server' OR kind LIKE 'consumer')) SINCE 1 hour ago COMPARE WITH 1 week ago FACET http.status_code TIMESERIES limit max"
+      );
+      expect(result.dql).toContain('count()');
+      expect(result.dql).toContain('append');
+    });
+
+    it('should translate cdfPercentage with COMPARE WITH', () => {
+      const result = translator.translate(
+        "SELECT cdfPercentage(duration.ms, 1000, 2000, 3000, 4000) FROM Span WHERE http.route = '/price-domain-api/v1/pricing' AND parent.id IS NULL and http.status_code < 300 TIMESERIES COMPARE WITH 1 week ago"
+      );
+      expect(result.dql).toContain('countIf(');
+      expect(result.dql).toContain('append');
     });
   });
 });

@@ -256,6 +256,11 @@
       "name": "Unknown event type",
       "nrql": "SELECT count(*) FROM CustomEvent",
       "expectedDqlContains": ["fetch logs", "eventType"]
+    },
+    {
+      "name": "AjaxRequest",
+      "nrql": "SELECT count(*) FROM AjaxRequest",
+      "expectedDqlContains": ["fetch bizevents"]
     }
   ],
   "complex": [
@@ -283,16 +288,86 @@
       "expectedWarningContains": "COMPARE WITH"
     },
     {
-      "name": "rate function",
-      "nrql": "SELECT rate(count(*), 1 minute) FROM Transaction",
+      "name": "histogram function",
+      "nrql": "SELECT histogram(duration, 100, 10) FROM Transaction",
       "shouldWarn": true,
-      "expectedWarningContains": "rate"
+      "expectedWarningContains": "histogram"
     },
     {
-      "name": "percentage function",
-      "nrql": "SELECT percentage(count(*), WHERE status = 200) FROM Transaction",
+      "name": "bytecountestimate function",
+      "nrql": "SELECT bytecountestimate() FROM Span",
       "shouldWarn": true,
-      "expectedWarningContains": "percentage"
+      "expectedWarningContains": "bytecountestimate"
+    }
+  ],
+  "rateFunction": [
+    {
+      "name": "Basic rate with count",
+      "nrql": "SELECT rate(count(*), 1 minute) FROM Transaction",
+      "expectedDqlContains": ["summarize", "count()"]
+    },
+    {
+      "name": "Rate with alias",
+      "nrql": "SELECT rate(count(*), 1 minute) AS 'API Calls Rate' FROM Span",
+      "expectedDqlContains": ["summarize", "API Calls Rate", "count()"]
+    },
+    {
+      "name": "Rate with TIMESERIES",
+      "nrql": "SELECT rate(count(*), 1 minute) FROM Span TIMESERIES",
+      "expectedDqlContains": ["makeTimeseries", "count()"]
+    },
+    {
+      "name": "Rate with FACET and TIMESERIES",
+      "nrql": "SELECT rate(count(*), 1 minute) FROM Span WHERE http.route = '/api/pricing' FACET http.status_code TIMESERIES",
+      "expectedDqlContains": ["makeTimeseries", "count()", "by:{http.response.status_code"]
+    }
+  ],
+  "percentageFunction": [
+    {
+      "name": "Basic percentage",
+      "nrql": "SELECT percentage(count(*), WHERE status = 200) FROM Transaction",
+      "expectedDqlContains": ["summarize", "countIf(", "count()"]
+    },
+    {
+      "name": "Percentage with alias",
+      "nrql": "SELECT percentage(count(http.status_code), where http.status_code > 199 and http.status_code < 300) as '2XX' from Span",
+      "expectedDqlContains": ["summarize", "2XX", "countIf("]
+    },
+    {
+      "name": "Multiple percentages",
+      "nrql": "SELECT percentage(count(http.status_code), where http.status_code > 199 and http.status_code < 300) as '2XX', percentage(count(http.status_code), where http.status_code > 499 and http.status_code < 600) as '5XX' from Span",
+      "expectedDqlContains": ["summarize", "2XX", "5XX", "countIf("]
+    }
+  ],
+  "cdfPercentageFunction": [
+    {
+      "name": "Basic cdfPercentage",
+      "nrql": "SELECT cdfPercentage(duration.ms, 1000, 2000, 3000, 4000) FROM Span",
+      "expectedDqlContains": ["summarize", "countIf(duration.ms <= 1000)", "countIf(duration.ms <= 4000)"]
+    },
+    {
+      "name": "cdfPercentage with TIMESERIES",
+      "nrql": "SELECT cdfPercentage(duration.ms, 1000, 2000) FROM Span TIMESERIES",
+      "expectedDqlContains": ["makeTimeseries", "countIf(duration.ms <= 1000)", "countIf(duration.ms <= 2000)"]
+    }
+  ],
+  "limitMax": [
+    {
+      "name": "LIMIT MAX omitted",
+      "nrql": "SELECT count(*) FROM Span FACET host LIMIT MAX",
+      "expectedDqlContains": ["summarize", "count()"]
+    },
+    {
+      "name": "LIMIT MAX does not produce limit in DQL",
+      "nrql": "SELECT average(duration) FROM Span FACET name LIMIT MAX",
+      "expectedDqlContains": ["summarize", "avg(duration)"]
+    }
+  ],
+  "casesFunction": [
+    {
+      "name": "CASES in FACET with two conditions",
+      "nrql": "SELECT count(*) FROM Span FACET http.status_code, CASES(where enduser.id = 'GUESTUSER' AS guest, where enduser.id != 'GUESTUSER' AS 'customer') TIMESERIES",
+      "expectedDqlContains": ["makeTimeseries", "fieldsAdd", "if(", "case_result"]
     }
   ]
 }

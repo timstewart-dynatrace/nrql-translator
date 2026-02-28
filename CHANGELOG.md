@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.31] - 2026-02-28
+
+### Added
+- **`rate()` function support**: `rate(count(*), 1 minute)` now decomposes to `count()` — with makeTimeseries, count per interval equals rate per interval period
+- **`percentage()` function support**: `percentage(count(field), where condition)` decomposes to `100.0 * countIf(condition) / count()`
+- **`cdfPercentage()` function support**: `cdfPercentage(field, t1, t2, t3, t4)` expands to multiple cumulative distribution `countIf(field <= threshold) / count()` expressions
+- **`CASES()` in FACET**: `CASES(where cond AS label, ...)` converts to DQL `fieldsAdd` with nested `if()` expressions
+- **`LIMIT MAX` support**: `LIMIT MAX` is now parsed and silently omitted (DQL has no explicit "no limit" syntax)
+- **`AjaxRequest` event type mapping**: Maps to `fetch bizevents` (browser AJAX request data)
+- **Depth-aware clause parsing**: WHERE and FACET parsers now use parenthesis-depth tracking to avoid matching keywords inside function calls like `CASES(where ...)`
+- New field mappings: `requestUrl` → `http.request.url`, `jobName` → `k8s.job.name`
+- 25 new tests (112 total)
+
+### Changed
+- `rate()` and `percentage()` moved from unsupported to fully supported functions
+- `bytecountestimate()` added to unsupported functions with descriptive message
+- FACET clause now uses paren-aware splitting (handles `CASES()`, `if()` in grouping fields)
+- Translation confidence improved from 93.4% HIGH to 98.0% HIGH across 854 production queries
+
+### Fixed
+- WHERE clause parser no longer matches `where` keyword inside `CASES(where ...)` function arguments
+- FACET clause parser no longer truncates content at `where` inside `CASES()` expressions
+
 ## [1.0.30] - 2026-02-28
 
 ### Fixed

@@ -47,11 +47,10 @@ export class NRQLToDQLTranslator {
    * Unsupported functions that require manual handling
    */
   private static readonly UNSUPPORTED_FUNCTIONS: Record<string, string> = {
-    'rate': 'Rate calculation requires manual implementation in DQL. Use base aggregation and divide by time window.',
     'histogram': 'Histogram requires manual implementation using summarize with bin() grouping',
     'funnel': 'Funnel analysis requires decomposition into sequential countIf() steps',
     'apdex': 'Apdex requires decomposition: (countIf(duration < T) + countIf(duration >= T and duration < 4T) * 0.5) / count()',
-    'percentage': 'Percentage requires decomposition: 100.0 * countIf(condition) / count()',
+    'bytecountestimate': 'bytecountestimate() has no DQL equivalent. Consider using data volume metrics instead.',
   };
 
   /**
@@ -158,6 +157,11 @@ export class NRQLToDQLTranslator {
       eventType: 'K8sNodeSample',
       dqlFetch: 'fetch dt.metrics',
       notes: 'Kubernetes node metrics - uses timeseries with dt.kubernetes.node.* metrics',
+    },
+    'ajaxrequest': {
+      eventType: 'AjaxRequest',
+      dqlFetch: 'fetch bizevents',
+      notes: 'Browser AJAX request data maps to business events',
     },
   };
 
@@ -399,7 +403,8 @@ export class NRQLToDQLTranslator {
     // List of known aggregation functions
     const aggFunctions = ['count', 'sum', 'avg', 'average', 'min', 'max', 'uniquecount',
                           'percentile', 'latest', 'earliest', 'uniques', 'median',
-                          'stddev', 'rate', 'percentage', 'histogram', 'funnel', 'apdex'];
+                          'stddev', 'rate', 'percentage', 'cdfpercentage', 'histogram',
+                          'funnel', 'apdex', 'bytecountestimate'];
 
     // Check if this is an arithmetic expression containing an aggregation
     // Pattern 1: (aggFunc(field) operator value) AS alias (with outer parens)
@@ -541,10 +546,9 @@ export class NRQLToDQLTranslator {
 
   /**
    * Parse WHERE clause
-   * Only matches WHERE after the FROM clause to avoid matching 'where' inside function calls
+   * Only matches WHERE at depth 0 (not inside parentheses like CASES(where ...))
    */
   private parseWhereClause(nrql: string): string | null {
-    // First find the FROM clause position to search for WHERE only after it
     const fromMatch = nrql.match(/\bFROM\s+\w+/i);
     if (!fromMatch) {
       return null;
@@ -552,28 +556,37 @@ export class NRQLToDQLTranslator {
 
     const afterFrom = nrql.substring(fromMatch.index! + fromMatch[0].length);
 
-    // Match WHERE ... until next keyword or end
-    // Note: (?:\s|$) allows keywords at end of query without trailing space
-    const whereMatch = afterFrom.match(
-      /\bWHERE\s+(.*?)(?=\s+(?:FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)(?:\s|$)|$)/i
-    );
-    return whereMatch ? whereMatch[1].trim() : null;
+    // Find WHERE keyword at depth 0 (not inside function calls or CASES)
+    const whereIdx = this.findClauseKeyword(afterFrom, 'WHERE');
+    if (whereIdx === -1) return null;
+
+    // Extract content after WHERE until next clause keyword at depth 0
+    const afterWhere = afterFrom.substring(whereIdx + 5).trim(); // 5 = 'WHERE'.length
+    const stopKeywords = ['FACET', 'TIMESERIES', 'SINCE', 'UNTIL', 'LIMIT', 'ORDER BY', 'COMPARE WITH', 'WITH TIMEZONE'];
+    const content = this.extractUntilClauseKeyword(afterWhere, stopKeywords);
+
+    return content || null;
   }
 
   /**
    * Parse FACET clause
    * Note: NRQL allows flexible clause ordering (FACET can come before or after WHERE)
+   * Uses depth-aware keyword search and paren-aware splitting for CASES()
    */
   private parseFacetClause(nrql: string): string[] {
-    // Note: (?:\s|$) allows keywords at end of query without trailing space
-    const facetMatch = nrql.match(
-      /FACET\s+(.*?)(?=\s+(?:WHERE|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE)(?:\s|$)|$)/i
-    );
-    if (!facetMatch) {
-      return [];
-    }
+    // Find FACET at depth 0
+    const facetIdx = this.findClauseKeyword(nrql, 'FACET');
+    if (facetIdx === -1) return [];
 
-    return facetMatch[1].split(',').map(f => f.trim());
+    // Extract content after FACET until next clause keyword at depth 0
+    const afterFacet = nrql.substring(facetIdx + 5).trim(); // 5 = 'FACET'.length
+    const stopKeywords = ['WHERE', 'TIMESERIES', 'SINCE', 'UNTIL', 'LIMIT', 'ORDER BY', 'COMPARE WITH', 'WITH TIMEZONE'];
+    const content = this.extractUntilClauseKeyword(afterFacet, stopKeywords);
+
+    if (!content) return [];
+
+    // Use paren-aware splitting to handle CASES(...) and if(...) in FACET
+    return this.splitSelectParts(content);
   }
 
   /**
@@ -636,8 +649,13 @@ export class NRQLToDQLTranslator {
 
   /**
    * Parse LIMIT clause
+   * Handles LIMIT <number> and LIMIT MAX (no limit)
    */
   private parseLimitClause(nrql: string): number | null {
+    // Check for LIMIT MAX first (means no limit)
+    if (/LIMIT\s+MAX/i.test(nrql)) {
+      return null;
+    }
     const limitMatch = nrql.match(/LIMIT\s+(\d+)/i);
     return limitMatch ? parseInt(limitMatch[1], 10) : null;
   }
@@ -1202,6 +1220,9 @@ export class NRQLToDQLTranslator {
       'k8s.container.cpuUsedCores': 'dt.kubernetes.container.cpu_usage',
       'k8s.container.memoryUsedBytes': 'dt.kubernetes.container.memory_usage',
       'k8s.container.restartCount': 'dt.kubernetes.container.restarts',
+      // Browser/RUM fields
+      'requestUrl': 'http.request.url',
+      'jobName': 'k8s.job.name',
     };
 
     for (const [nrField, dtField] of Object.entries(standardMappings)) {
@@ -1366,15 +1387,27 @@ export class NRQLToDQLTranslator {
       return '| summarize count()';
     }
 
-    let cmd = `| summarize ${aggregations.join(', ')}`;
+    let cmd = '';
 
-    // Add FACET as by:{}
+    // Process FACET fields (handles CASES(), if(), and regular fields)
     if (facet.length > 0) {
-      const mappedFacets = facet.map(f => this.mapFieldNames(f, undefined));
-      cmd += `, by:{${mappedFacets.join(', ')}}`;
-      notes.keyDifferences.push(
-        'NRQL FACET clause maps to DQL by:{} syntax in summarize command'
-      );
+      const { facetFields, fieldsAddCmds } = this.processFacetFields(facet, undefined, warnings, notes);
+
+      // Add fieldsAdd commands before summarize
+      if (fieldsAddCmds.length > 0) {
+        cmd += fieldsAddCmds.join('\n') + '\n';
+      }
+
+      cmd += `| summarize ${aggregations.join(', ')}`;
+
+      if (facetFields.length > 0) {
+        cmd += `, by:{${facetFields.join(', ')}}`;
+        notes.keyDifferences.push(
+          'NRQL FACET clause maps to DQL by:{} syntax in summarize command'
+        );
+      }
+    } else {
+      cmd = `| summarize ${aggregations.join(', ')}`;
     }
 
     return cmd;
@@ -1418,6 +1451,21 @@ export class NRQLToDQLTranslator {
       // Fallback: pass through as-is with warning
       warnings.push(`Could not parse arithmetic expression: ${expr}`);
       return `${alias} = ${expr}`;
+    }
+
+    // Handle rate() decomposition: rate(count(*), 1 minute) → count()
+    if (funcName === 'rate') {
+      return this.translateRateFunction(agg, warnings, notes);
+    }
+
+    // Handle percentage() decomposition: percentage(count(f), where cond) → 100.0 * countIf(cond) / count()
+    if (funcName === 'percentage') {
+      return this.translatePercentageFunction(agg, warnings, notes);
+    }
+
+    // Handle cdfPercentage() expansion: cdfPercentage(field, t1, t2, ...) → multiple countIf expressions
+    if (funcName === 'cdfpercentage') {
+      return this.translateCdfPercentageFunction(agg, warnings, notes);
     }
 
     // Check for unsupported functions
@@ -1473,6 +1521,102 @@ export class NRQLToDQLTranslator {
   }
 
   /**
+   * Translate rate() function
+   * rate(count(*), 1 minute) → count() with note about rate interpretation
+   * rate(sum(field), 1 hour) → sum(field) with note
+   */
+  private translateRateFunction(
+    agg: AggregationFunction,
+    warnings: string[],
+    notes: TranslationNotes
+  ): string | null {
+    const alias = agg.alias ?? 'rate';
+    const baseAggStr = agg.args[0] ?? 'count(*)';
+    const timeWindow = agg.args[1] ?? '1 minute';
+
+    // Parse the base aggregation function
+    const baseAgg = this.parseAggregationFunction(baseAggStr);
+    if (baseAgg) {
+      const dqlBase = this.translateAggregation(baseAgg, warnings, notes);
+      if (dqlBase) {
+        // Extract just the expression part (after the "alias = " prefix)
+        const exprPart = dqlBase.includes('=') ? dqlBase.split('=').slice(1).join('=').trim() : dqlBase;
+        notes.keyDifferences.push(
+          `rate(${baseAggStr}, ${timeWindow}) decomposed to base aggregation. With makeTimeseries, count per interval equals the rate per interval period.`
+        );
+        return `${alias} = ${exprPart}`;
+      }
+    }
+
+    // Fallback: use count()
+    warnings.push(`Could not parse base aggregation in rate(): ${baseAggStr}`);
+    return `${alias} = count()`;
+  }
+
+  /**
+   * Translate percentage() function
+   * percentage(count(field), where condition) → 100.0 * countIf(condition) / count()
+   */
+  private translatePercentageFunction(
+    agg: AggregationFunction,
+    warnings: string[],
+    notes: TranslationNotes
+  ): string | null {
+    const alias = agg.alias ?? 'percentage';
+
+    if (agg.args.length < 2) {
+      warnings.push('percentage() requires at least 2 arguments: aggregation and where condition');
+      return `${alias} = count()`;
+    }
+
+    // Second arg is "where condition" or "WHERE condition"
+    const conditionArg = agg.args[1].trim();
+    const condition = conditionArg.replace(/^\s*where\s+/i, '').trim();
+
+    // Translate the condition using the same operator conversion pipeline
+    const translatedCondition = this.translateWhereConditions(condition, undefined, warnings, notes);
+
+    notes.keyDifferences.push(
+      'percentage() decomposed to 100.0 * countIf(condition) / count()'
+    );
+
+    return `${alias} = 100.0 * countIf(${translatedCondition}) / count()`;
+  }
+
+  /**
+   * Translate cdfPercentage() function
+   * cdfPercentage(field, t1, t2, t3, t4) → comma-separated countIf expressions for each threshold
+   * Each threshold becomes: 100.0 * countIf(field <= threshold) / count()
+   */
+  private translateCdfPercentageFunction(
+    agg: AggregationFunction,
+    warnings: string[],
+    notes: TranslationNotes
+  ): string | null {
+    if (agg.args.length < 2) {
+      warnings.push('cdfPercentage() requires field and at least one threshold');
+      return null;
+    }
+
+    const field = agg.args[0].trim();
+    const thresholds = agg.args.slice(1).map(t => t.trim());
+
+    // Generate one countIf expression per threshold
+    const expressions = thresholds.map(threshold => {
+      // Create a clean alias from the threshold (replace . with _)
+      const cleanThreshold = threshold.replace('.', '_');
+      return `pct_le_${cleanThreshold} = 100.0 * countIf(${field} <= ${threshold}) / count()`;
+    });
+
+    notes.keyDifferences.push(
+      `cdfPercentage(${field}, ${thresholds.join(', ')}) expanded to ${thresholds.length} cumulative distribution countIf() expressions`
+    );
+
+    // Return all expressions comma-separated — they'll be joined into the summarize/makeTimeseries
+    return expressions.join(', ');
+  }
+
+  /**
    * Generate makeTimeseries command for time series queries
    */
   private generateTimeseries(
@@ -1499,12 +1643,24 @@ export class NRQLToDQLTranslator {
       aggregations.push('count = count()');
     }
 
-    let cmd = `| makeTimeseries ${aggregations.join(', ')}, interval:${interval}`;
+    let cmd = '';
 
-    // Add grouping
+    // Process FACET fields (handles CASES(), if(), and regular fields)
     if (facet.length > 0) {
-      const mappedFacets = facet.map(f => this.mapFieldNames(f, undefined));
-      cmd += `, by:{${mappedFacets.join(', ')}}`;
+      const { facetFields, fieldsAddCmds } = this.processFacetFields(facet, undefined, warnings, notes);
+
+      // Add fieldsAdd commands before makeTimeseries
+      if (fieldsAddCmds.length > 0) {
+        cmd += fieldsAddCmds.join('\n') + '\n';
+      }
+
+      cmd += `| makeTimeseries ${aggregations.join(', ')}, interval:${interval}`;
+
+      if (facetFields.length > 0) {
+        cmd += `, by:{${facetFields.join(', ')}}`;
+      }
+    } else {
+      cmd = `| makeTimeseries ${aggregations.join(', ')}, interval:${interval}`;
     }
 
     notes.keyDifferences.push(
@@ -1637,6 +1793,163 @@ export class NRQLToDQLTranslator {
     }
 
     return fields;
+  }
+
+  /**
+   * Process FACET fields, converting CASES() expressions to fieldsAdd + field name
+   * Returns { facetFields: string[], fieldsAddCmds: string[] }
+   */
+  private processFacetFields(
+    facet: string[],
+    context: TranslationContext | undefined,
+    warnings: string[],
+    notes: TranslationNotes
+  ): { facetFields: string[]; fieldsAddCmds: string[] } {
+    const facetFields: string[] = [];
+    const fieldsAddCmds: string[] = [];
+
+    for (const f of facet) {
+      const trimmed = f.trim();
+
+      // Check for CASES(...) expression
+      const casesMatch = trimmed.match(/^CASES\s*\((.*)\)$/i);
+      if (casesMatch) {
+        const casesContent = casesMatch[1];
+        const caseResult = this.convertCasesToIf(casesContent, context, warnings, notes);
+        if (caseResult) {
+          fieldsAddCmds.push(`| fieldsAdd ${caseResult.fieldName} = ${caseResult.expression}`);
+          facetFields.push(caseResult.fieldName);
+        }
+        continue;
+      }
+
+      // Check for inline if() expression in FACET
+      if (/^if\s*\(/i.test(trimmed)) {
+        const alias = 'computed_facet';
+        const mappedExpr = this.mapFieldNames(trimmed, context);
+        fieldsAddCmds.push(`| fieldsAdd ${alias} = ${mappedExpr}`);
+        facetFields.push(alias);
+        notes.keyDifferences.push('Inline if() in FACET moved to fieldsAdd command');
+        continue;
+      }
+
+      // Regular field — apply field mapping
+      facetFields.push(this.mapFieldNames(trimmed, context));
+    }
+
+    return { facetFields, fieldsAddCmds };
+  }
+
+  /**
+   * Convert NRQL CASES() expression to DQL if() expression
+   * CASES(where cond1 AS label1, where cond2 AS label2, ...) → nested if()
+   */
+  private convertCasesToIf(
+    casesContent: string,
+    context: TranslationContext | undefined,
+    warnings: string[],
+    notes: TranslationNotes
+  ): { fieldName: string; expression: string } | null {
+    // Parse individual case entries: "where condition AS label"
+    const caseEntries: Array<{ condition: string; label: string }> = [];
+
+    // Split by "where" keyword (case-insensitive), keeping only non-empty parts
+    const parts = casesContent.split(/\bwhere\b/i).filter(p => p.trim());
+
+    for (const part of parts) {
+      const asMatch = part.match(/^(.*?)\s+AS\s+['"]?([^'"]+)['"]?\s*,?\s*$/i);
+      if (asMatch) {
+        caseEntries.push({
+          condition: asMatch[1].trim(),
+          label: asMatch[2].trim(),
+        });
+      }
+    }
+
+    if (caseEntries.length === 0) {
+      warnings.push('Could not parse CASES() expression');
+      return null;
+    }
+
+    // Build nested if() expression
+    // For 2 cases: if(cond1, "label1", "label2")
+    // For 3+ cases: if(cond1, "label1", else(if(cond2, "label2", "label3")))
+    const buildIf = (entries: Array<{ condition: string; label: string }>, index: number): string => {
+      if (index >= entries.length - 1) {
+        // Last entry — just return the label as default
+        return `"${entries[index].label}"`;
+      }
+
+      const entry = entries[index];
+      const translatedCond = this.translateWhereConditions(entry.condition, context, warnings, notes);
+      const elseExpr = index === entries.length - 2
+        ? `"${entries[index + 1].label}"`
+        : buildIf(entries, index + 1);
+
+      return `if(${translatedCond}, "${entry.label}", ${elseExpr})`;
+    };
+
+    const expression = buildIf(caseEntries, 0);
+
+    notes.keyDifferences.push(
+      'NRQL CASES() converted to DQL if() expression via fieldsAdd'
+    );
+
+    return { fieldName: 'case_result', expression };
+  }
+
+  /**
+   * Find a clause keyword at depth 0 (not inside parentheses)
+   * Returns the index of the keyword start, or -1 if not found
+   */
+  private findClauseKeyword(text: string, keyword: string): number {
+    let depth = 0;
+    const upper = text.toUpperCase();
+    const kw = keyword.toUpperCase();
+    const kwLen = kw.length;
+
+    for (let i = 0; i <= text.length - kwLen; i++) {
+      if (text[i] === '(') { depth++; continue; }
+      if (text[i] === ')') { depth--; continue; }
+
+      if (depth === 0 && upper.substring(i, i + kwLen) === kw) {
+        const before = i > 0 ? text[i - 1] : ' ';
+        const after = i + kwLen < text.length ? text[i + kwLen] : ' ';
+        if (/\W/.test(before) && /\W/.test(after)) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Extract text until a clause keyword at depth 0
+   */
+  private extractUntilClauseKeyword(text: string, keywords: string[]): string {
+    let depth = 0;
+    const upper = text.toUpperCase();
+
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '(') { depth++; continue; }
+      if (text[i] === ')') { depth--; continue; }
+
+      if (depth === 0) {
+        for (const kw of keywords) {
+          const kwUpper = kw.toUpperCase();
+          const kwLen = kwUpper.length;
+          if (i + kwLen <= text.length && upper.substring(i, i + kwLen) === kwUpper) {
+            const before = i > 0 ? text[i - 1] : ' ';
+            const after = i + kwLen < text.length ? text[i + kwLen] : ' ';
+            if (/\W/.test(before) && (/\W/.test(after) || i + kwLen === text.length)) {
+              return text.substring(0, i).trim();
+            }
+          }
+        }
+      }
+    }
+
+    return text.trim();
   }
 
   /**
