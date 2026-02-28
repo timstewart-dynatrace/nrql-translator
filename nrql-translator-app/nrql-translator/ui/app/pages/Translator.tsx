@@ -8,17 +8,20 @@ import {
 } from "@dynatrace/strato-components/typography";
 import { Button } from "@dynatrace/strato-components/buttons";
 import { TextArea } from "@dynatrace/strato-components-preview/forms";
+import { Modal } from "@dynatrace/strato-components-preview/overlays";
+import { HelpIcon } from "@dynatrace/strato-icons";
 import { sendIntent } from "@dynatrace-sdk/navigation";
 import { NRQLToDQLTranslator } from "../utils/NRQLToDQLTranslator";
 import { TranslationResult } from "../utils/types";
 
-const APP_VERSION = "1.0.28";
+const APP_VERSION = "1.0.29";
 
 export const Translator = () => {
   const [nrqlQuery, setNrqlQuery] = useState("");
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleTranslate = useCallback(() => {
     if (!nrqlQuery.trim()) {
@@ -76,16 +79,71 @@ export const Translator = () => {
 
   return (
     <Flex flexDirection="column" gap={16} padding={32}>
-      <Flex flexDirection="column" gap={8}>
-        <Heading level={1}>NRQL to DQL Translator</Heading>
-        <Paragraph>
-          Translate New Relic Query Language (NRQL) queries to Dynatrace Query
-          Language (DQL) for migration.
-        </Paragraph>
-        <Text style={{ fontSize: "12px", color: "var(--dt-colors-text-neutral-default)" }}>
-          v{APP_VERSION}
-        </Text>
+      <Flex justifyContent="space-between" alignItems="flex-start">
+        <Flex flexDirection="column" gap={8}>
+          <Heading level={1}>NRQL to DQL Translator</Heading>
+          <Paragraph>
+            Translate New Relic Query Language (NRQL) queries to Dynatrace Query
+            Language (DQL) for migration.
+          </Paragraph>
+          <Text style={{ fontSize: "12px", color: "var(--dt-colors-text-neutral-default)" }}>
+            v{APP_VERSION}
+          </Text>
+        </Flex>
+        <Button onClick={() => setShowHelp(true)} variant="default">
+          <Button.Prefix><HelpIcon /></Button.Prefix>
+          Help
+        </Button>
       </Flex>
+
+      <Modal title="NRQL to DQL Translator — Help" show={showHelp} onDismiss={() => setShowHelp(false)} size="medium">
+        <Flex flexDirection="column" gap={16}>
+          <Flex flexDirection="column" gap={8}>
+            <Text style={{ fontWeight: "bold" }}>How to use</Text>
+            <ol style={{ margin: 0, paddingLeft: 20 }}>
+              <li><Text>Paste your NRQL query into the input field</Text></li>
+              <li><Text>Click <strong>Translate to DQL</strong> to convert it</Text></li>
+              <li><Text>Review the translated DQL, confidence level, and any warnings</Text></li>
+              <li><Text>Click <strong>Open in Notebook</strong> to test the query directly in a Dynatrace Notebook</Text></li>
+              <li><Text>Or use <strong>Open with...</strong> to send it to any compatible Dynatrace app</Text></li>
+              <li><Text>Use <strong>Copy DQL</strong> to copy the query to your clipboard</Text></li>
+            </ol>
+          </Flex>
+
+          <Flex flexDirection="column" gap={8}>
+            <Text style={{ fontWeight: "bold" }}>Supported NRQL features</Text>
+            <ul style={{ margin: 0, paddingLeft: 20 }}>
+              <li><Text>SELECT with aggregation functions (count, average, sum, min, max, percentile, uniqueCount, latest, earliest, stddev, median)</Text></li>
+              <li><Text>FROM with event type mapping (Transaction, Span, Log, Metric, PageView, and more)</Text></li>
+              <li><Text>WHERE clause with operators (=, !=, &gt;, &lt;, LIKE, IN, IS NULL, AND, OR)</Text></li>
+              <li><Text>FACET for grouping, TIMESERIES for time-based charts</Text></li>
+              <li><Text>ORDER BY, LIMIT, COMPARE WITH, and aliases (AS)</Text></li>
+            </ul>
+          </Flex>
+
+          <Flex flexDirection="column" gap={8}>
+            <Text style={{ fontWeight: "bold" }}>Confidence levels</Text>
+            <ul style={{ margin: 0, paddingLeft: 20 }}>
+              <li><Text><strong>HIGH</strong> — Direct mapping exists; query should work as-is</Text></li>
+              <li><Text><strong>MEDIUM</strong> — Translated with some approximations; review recommended</Text></li>
+              <li><Text><strong>LOW</strong> — Contains unsupported features; manual adjustment needed</Text></li>
+            </ul>
+          </Flex>
+
+          <Surface>
+            <Flex flexDirection="column" gap={4} padding={12}>
+              <Text style={{ fontSize: "12px", color: "var(--dt-colors-text-neutral-default)" }}>
+                v{APP_VERSION}
+              </Text>
+              <Text style={{ fontSize: "12px", color: "var(--dt-colors-text-neutral-default)" }}>
+                This application was AI-generated from community-submitted and publicly available sources.
+                It is not officially supported by Dynatrace. Always verify translated queries against
+                official <a href="https://docs.dynatrace.com/docs" target="_blank" rel="noopener noreferrer">Dynatrace documentation</a>.
+              </Text>
+            </Flex>
+          </Surface>
+        </Flex>
+      </Modal>
 
       <Surface>
         <Flex flexDirection="column" gap={16} padding={16}>
