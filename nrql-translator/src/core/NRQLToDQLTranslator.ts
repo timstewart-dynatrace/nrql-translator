@@ -307,14 +307,15 @@ export class NRQLToDQLTranslator {
 
     // Check if query starts with FROM (FROM ... SELECT pattern)
     if (/^\s*FROM\s+/i.test(nrql)) {
-      // Pattern: FROM EventType SELECT ... [WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER BY|COMPARE WITH|WITH TIMEZONE|SLIDE BY]
-      const fromSelectMatch = nrql.match(
-        /FROM\s+\w+(?:\s*,\s*\w+)*\s+SELECT\s+(.*?)(?=\s+(?:WHERE|FACET|TIMESERIES|SINCE|UNTIL|LIMIT|ORDER\s+BY|COMPARE\s+WITH|WITH\s+TIMEZONE|SLIDE\s+BY)\s|$)/i
-      );
-      if (!fromSelectMatch) {
+      // Use depth-aware keyword search to avoid matching WHERE inside filter() args
+      const selectIdx = this.findClauseKeyword(nrql, 'SELECT');
+      if (selectIdx === -1) {
         throw new Error('Invalid NRQL: Missing SELECT clause after FROM');
       }
-      selectContent = fromSelectMatch[1].trim();
+      const afterSelect = nrql.substring(selectIdx + 6).trim(); // 6 = 'SELECT'.length
+      const stopKeywords = ['WHERE', 'FACET', 'TIMESERIES', 'SINCE', 'UNTIL', 'LIMIT',
+                            'ORDER BY', 'COMPARE WITH', 'WITH TIMEZONE', 'SLIDE BY'];
+      selectContent = this.extractUntilClauseKeyword(afterSelect, stopKeywords);
     } else {
       // Traditional pattern: SELECT ... FROM
       const selectMatch = nrql.match(/SELECT\s+(.*?)\s+FROM\s/i);
@@ -408,26 +409,52 @@ export class NRQLToDQLTranslator {
                           'funnel', 'apdex', 'bytecountestimate', 'filter'];
 
     // Check if this is an arithmetic expression containing an aggregation
-    // Pattern 1: (aggFunc(field) operator value) AS alias (with outer parens)
-    const arithmeticMatch = part.match(/^\((.+)\)\s*(?:AS\s+['"]?(.+?)['"]?)?$/i);
-    if (arithmeticMatch) {
-      const innerExpr = arithmeticMatch[1];
-      const alias = arithmeticMatch[2]?.replace(/['"]/g, '') ?? null;
+    // Pattern 1: (expr) [OP value] [AS alias] (with outer parens)
+    if (part.startsWith('(')) {
+      // Find matching closing paren using depth tracking
+      let parenDepth = 1;
+      let closeIdx = 1;
+      for (let i = 1; i < part.length; i++) {
+        if (part[i] === '(') parenDepth++;
+        else if (part[i] === ')') parenDepth--;
+        if (parenDepth === 0) { closeIdx = i; break; }
+      }
 
-      // Check if innerExpr contains any aggregation function
-      const hasAggregation = aggFunctions.some(fn =>
-        new RegExp(`\\b${fn}\\s*\\(`, 'i').test(innerExpr)
-      );
+      if (parenDepth === 0) {
+        const innerExpr = part.substring(1, closeIdx);
+        const afterParen = part.substring(closeIdx + 1).trim();
 
-      if (hasAggregation) {
-        // This is an arithmetic expression with aggregation
-        // Store the whole expression and let translateAggregation handle it
-        return {
-          name: '_arithmetic_',
-          args: [innerExpr],
-          alias,
-          original: part,
-        };
+        // Check if innerExpr contains any aggregation function
+        const hasAggregation = aggFunctions.some(fn =>
+          new RegExp(`\\b${fn}\\s*\\(`, 'i').test(innerExpr)
+        );
+
+        if (hasAggregation) {
+          // Extract optional alias and arithmetic suffix (e.g., "* 100 AS 'Error %'")
+          let alias: string | null = null;
+          let arithmeticSuffix = '';
+
+          if (afterParen.length > 0) {
+            const asIdx = this.findClauseKeyword(afterParen, 'AS');
+            if (asIdx !== -1) {
+              alias = afterParen.substring(asIdx + 2).trim().replace(/^['"]|['"]$/g, '');
+              arithmeticSuffix = afterParen.substring(0, asIdx).trim();
+            } else {
+              arithmeticSuffix = afterParen;
+            }
+          }
+
+          const fullExpr = arithmeticSuffix
+            ? `(${innerExpr}) ${arithmeticSuffix}`
+            : innerExpr;
+
+          return {
+            name: '_arithmetic_',
+            args: [fullExpr],
+            alias,
+            original: part,
+          };
+        }
       }
     }
 
@@ -485,8 +512,29 @@ export class NRQLToDQLTranslator {
     const aliasMatch = afterFunc.match(/^AS\s+['"]?(.+?)['"]?$/i);
     if (aliasMatch) {
       alias = aliasMatch[1].replace(/['"]/g, '');
-    } else if (afterFunc.length > 0 && !afterFunc.startsWith('AS')) {
-      // There's content after the function that isn't an alias
+    } else if (afterFunc.length > 0 && !afterFunc.match(/^AS\s/i)) {
+      // Content after function isn't an alias — check for arithmetic operator
+      const opMatch = afterFunc.match(/^[+\-*\/]/);
+      if (opMatch) {
+        // Arithmetic expression: func(...) OP rest [AS alias]
+        let arithmeticAlias: string | null = null;
+        let fullExpr = part;
+
+        // Find AS at depth 0 in afterFunc for the alias
+        const asIdx = this.findClauseKeyword(afterFunc, 'AS');
+        if (asIdx !== -1) {
+          const afterAs = afterFunc.substring(asIdx + 2).trim();
+          arithmeticAlias = afterAs.replace(/^['"]|['"]$/g, '');
+          fullExpr = (part.substring(0, endIdx + 1) + ' ' + afterFunc.substring(0, asIdx)).trim();
+        }
+
+        return {
+          name: '_arithmetic_',
+          args: [fullExpr],
+          alias: arithmeticAlias,
+          original: part,
+        };
+      }
       return null;
     }
 
@@ -803,7 +851,8 @@ export class NRQLToDQLTranslator {
         const renamedParts = dqlParts.map((part) => {
           if (part.startsWith('| summarize') || part.startsWith('| makeTimeseries')) {
             // Add "current_" prefix to aggregation aliases
-            return part.replace(/(\w+)\s*=/g, 'current_$1 =');
+            // Use lookbehind/lookahead to avoid matching ==, >=, <=, !=
+            return part.replace(/(\w+)\s*(?<![=!<>])=(?!=)/g, 'current_$1 =');
           }
           return part;
         });
@@ -1313,6 +1362,18 @@ export class NRQLToDQLTranslator {
       }
     );
 
+    // IS TRUE -> field == true
+    result = result.replace(/(\w[\w.]*)\s+IS\s+TRUE/gi, '$1 == true');
+
+    // IS FALSE -> field == false
+    result = result.replace(/(\w[\w.]*)\s+IS\s+FALSE/gi, '$1 == false');
+
+    // IS NOT TRUE -> field != true
+    result = result.replace(/(\w[\w.]*)\s+IS\s+NOT\s+TRUE/gi, '$1 != true');
+
+    // IS NOT FALSE -> field != false
+    result = result.replace(/(\w[\w.]*)\s+IS\s+NOT\s+FALSE/gi, '$1 != false');
+
     // IS NULL -> isNull()
     result = result.replace(/(\w+)\s+IS\s+NULL/gi, 'isNull($1)');
 
@@ -1468,29 +1529,14 @@ export class NRQLToDQLTranslator {
       const expr = agg.args[0];
       const alias = agg.alias ?? 'result';
 
-      // Extract the aggregation function from the arithmetic expression
-      // e.g., "max(memoryUsedBytes)/1000000" -> extract max(memoryUsedBytes)
-      const aggMatch = expr.match(/\b(count|sum|avg|average|min|max|uniquecount|percentile|latest|earliest|uniques|median)\s*\([^)]+\)/i);
+      // Translate all aggregation function calls in the expression
+      const dqlExpr = this.translateArithmeticExpressionParts(expr, warnings, notes);
 
-      if (aggMatch) {
-        // aggMatch[0] is the full match, aggMatch[1] is the function name
-        const aggFunc = aggMatch[1].toLowerCase();
-        const dqlFunc = NRQLToDQLTranslator.FUNCTION_MAP[aggFunc]?.dql ?? aggFunc;
+      notes.keyDifferences.push(
+        `Arithmetic expression "${agg.original}" translated inline. For complex expressions, consider using fieldsAdd for clarity.`
+      );
 
-        // Replace the NRQL function with DQL function in the expression
-        let dqlExpr = expr.replace(new RegExp(`\\b${aggMatch[1]}\\b`, 'i'), dqlFunc);
-
-        // Generate with alias
-        notes.keyDifferences.push(
-          `Arithmetic expression "${agg.original}" translated inline. For complex expressions, consider using fieldsAdd for clarity.`
-        );
-
-        return `${alias} = ${dqlExpr}`;
-      }
-
-      // Fallback: pass through as-is with warning
-      warnings.push(`Could not parse arithmetic expression: ${expr}`);
-      return `${alias} = ${expr}`;
+      return `${alias} = ${dqlExpr}`;
     }
 
     // Handle rate() decomposition: rate(count(*), 1 minute) → count()
@@ -1708,15 +1754,19 @@ export class NRQLToDQLTranslator {
     }
 
     // For other aggregations like average(field) → avg(if(condition, field))
+    // For multi-arg functions like percentile(field, 95) → percentile(if(condition, field), 95)
     const dqlFuncName = NRQLToDQLTranslator.FUNCTION_MAP[innerFuncName]?.dql ?? innerFuncName;
     const field = innerAgg.args[0] ?? '*';
     const mappedField = this.mapFieldNames(field, undefined);
+    const ifExpr = `if(${translatedCondition}, ${mappedField})`;
+    const extraArgs = innerAgg.args.slice(1);
+    const allArgs = [ifExpr, ...extraArgs];
 
     notes.keyDifferences.push(
-      `filter(${innerFuncName}(${field}), WHERE ${condition}) decomposed to ${dqlFuncName}(if(condition, field))`
+      `filter(${innerFuncName}(${innerAgg.args.join(', ')}), WHERE ${condition}) decomposed to ${dqlFuncName}(${allArgs.join(', ')})`
     );
 
-    return `${alias} = ${dqlFuncName}(if(${translatedCondition}, ${mappedField}))`;
+    return `${alias} = ${dqlFuncName}(${allArgs.join(', ')})`;
   }
 
   /**
@@ -2024,6 +2074,78 @@ export class NRQLToDQLTranslator {
     );
 
     return { fieldName: 'case_result', expression };
+  }
+
+  /**
+   * Translate all aggregation function calls within an arithmetic expression.
+   * Scans the expression for known aggregation functions, translates each one,
+   * and preserves arithmetic operators and literals between them.
+   */
+  private translateArithmeticExpressionParts(
+    expr: string,
+    warnings: string[],
+    notes: TranslationNotes
+  ): string {
+    const aggFunctions = ['count', 'sum', 'avg', 'average', 'min', 'max', 'uniquecount',
+                          'percentile', 'latest', 'earliest', 'uniques', 'median',
+                          'stddev', 'rate', 'percentage', 'cdfpercentage', 'histogram',
+                          'funnel', 'apdex', 'bytecountestimate', 'filter'];
+
+    let result = '';
+    let i = 0;
+
+    while (i < expr.length) {
+      // Try to match a function name at current position
+      const remaining = expr.substring(i);
+      const funcMatch = remaining.match(/^(\w+)\s*\(/);
+
+      if (funcMatch && aggFunctions.includes(funcMatch[1].toLowerCase())) {
+        const openParenPos = i + funcMatch[0].length - 1;
+
+        // Find matching closing paren
+        let depth = 1;
+        let j = openParenPos + 1;
+        while (j < expr.length && depth > 0) {
+          if (expr[j] === '(') depth++;
+          else if (expr[j] === ')') depth--;
+          j++;
+        }
+
+        if (depth === 0) {
+          // Extract the full function call
+          const fullCall = expr.substring(i, j);
+
+          // Parse and translate
+          const parsed = this.parseAggregationFunction(fullCall);
+          if (parsed) {
+            const translated = this.translateAggregation(parsed, warnings, notes);
+            if (translated) {
+              // Strip the alias prefix ("alias = expr" → "expr")
+              const eqIdx = translated.indexOf(' = ');
+              if (eqIdx >= 0) {
+                result += translated.substring(eqIdx + 3);
+              } else {
+                result += translated;
+              }
+            } else {
+              result += fullCall;
+            }
+          } else {
+            result += fullCall;
+          }
+
+          i = j;
+        } else {
+          result += expr[i];
+          i++;
+        }
+      } else {
+        result += expr[i];
+        i++;
+      }
+    }
+
+    return result;
   }
 
   /**

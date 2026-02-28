@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.33] - 2026-02-28
+
+### Added
+- **Arithmetic `filter()` expressions**: Properly translates `filter(agg1) / filter(agg2) AS alias` and `(filter(count(*), WHERE cond) / count(*)) * 100 AS alias` — all combinations of division, subtraction, multiplication with filter() calls
+- **Multi-arg inner functions in `filter()`**: `filter(percentile(duration, 95), WHERE cond)` now correctly preserves the percentile value → `percentile(if(cond, duration), 95)`
+- **`IS TRUE` / `IS FALSE` operator conversion**: `error IS TRUE` → `error == true`, `error IS FALSE` → `error == false`
+- 6 new tests (133 total)
+
+### Fixed
+- **FROM...SELECT with `filter()` WHERE truncation**: Replaced regex-based SELECT clause extraction with depth-aware parsing to prevent `WHERE` inside `filter()` args from truncating the SELECT content
+- **`parseAggregationFunction` arithmetic continuation**: Expressions like `filter(a) / filter(b) AS alias` are now recognized as `_arithmetic_` expressions instead of returning null
+- **`_arithmetic_` handler upgraded**: Replaced simple regex with depth-aware function scanning (`translateArithmeticExpressionParts`) to handle nested function calls like `filter()` within arithmetic expressions
+- **COMPARE WITH alias prefix**: `current_` prefix regex no longer corrupts field comparisons inside aggregation expressions (e.g., `service.name == "checkout"` was becoming `service.current_name == "checkout"`)
+
 ## [1.0.32] - 2026-02-28
 
 ### Added
