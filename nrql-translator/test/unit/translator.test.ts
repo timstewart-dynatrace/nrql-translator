@@ -165,7 +165,7 @@ describe('NRQLToDQLTranslator', () => {
     it('should return lower confidence for queries with unsupported features', () => {
       // Multiple unsupported functions to lower confidence
       const result = translator.translate(
-        'SELECT stddev(duration), rate(count(*), 1 minute) FROM Transaction'
+        'SELECT rate(count(*), 1 minute), histogram(duration, 100, 10) FROM Transaction'
       );
       expect(['medium', 'low']).toContain(result.confidence);
     });
@@ -252,7 +252,7 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host"
       );
-      // Metric queries use timeseries command with avg() since DQL doesn't support last()
+      // Metric queries use timeseries command with avg() since DQL timeseries doesn't support takeLast()
       expect(result.dql).toContain('timeseries');
       expect(result.dql).toContain('avg(cpuUsage)');
       expect(result.dql).toContain('by:{');
@@ -262,7 +262,7 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "FROM Transaction SELECT count(*) WHERE appName = 'MyApp'"
       );
-      expect(result.dql).toContain('fetch logs');
+      expect(result.dql).toContain('fetch spans');
       expect(result.dql).toContain('count()');
       expect(result.dql).toContain('service.name');
     });
@@ -316,7 +316,7 @@ describe('NRQLToDQLTranslator', () => {
         "FROM Metric SELECT latest(cpuUsage) as CPUUsage FACET host WHERE appName = 'MyApp'"
       );
       expect(result.dql).toContain('timeseries');
-      // DQL timeseries only supports avg, sum, min, max, count, rate - latest() maps to avg()
+      // DQL timeseries only supports avg, sum, min, max, count, rate - latest() maps to avg() since takeLast() is not available in timeseries
       expect(result.dql).toContain('CPUUsage = avg(cpuUsage)');
       expect(result.dql).toContain('by:{');
       expect(result.dql).toContain('filter');

@@ -34,24 +34,24 @@ export class NRQLToDQLTranslator {
     'sum': { dql: 'sum' },
     'max': { dql: 'max' },
     'min': { dql: 'min' },
-    'uniquecount': { dql: 'countDistinct' },
+    'uniquecount': { dql: 'countDistinctExact', notes: 'uniqueCount maps to countDistinctExact for exact cardinality' },
     'percentile': { dql: 'percentile' },
-    'latest': { dql: 'last' },
-    'earliest': { dql: 'first' },
+    'latest': { dql: 'takeLast', notes: 'latest() maps to takeLast() - takes last value by ingest order' },
+    'earliest': { dql: 'takeFirst', notes: 'earliest() maps to takeFirst() - takes first value by ingest order' },
     'uniques': { dql: 'collectDistinct' },
     'median': { dql: 'percentile', notes: 'median converted to percentile(field, 50)' },
+    'stddev': { dql: 'stddev', notes: 'stddev() is natively supported in DQL' },
   };
 
   /**
    * Unsupported functions that require manual handling
    */
   private static readonly UNSUPPORTED_FUNCTIONS: Record<string, string> = {
-    'stddev': 'Standard deviation is not directly supported in DQL',
-    'rate': 'Rate calculation requires manual implementation in DQL',
-    'histogram': 'Histogram is not directly supported in DQL',
-    'funnel': 'Funnel analysis requires Dynatrace Session Replay or manual implementation',
-    'apdex': 'Apdex calculation requires manual threshold configuration in DQL',
-    'percentage': 'Percentage calculation requires manual implementation',
+    'rate': 'Rate calculation requires manual implementation in DQL. Use base aggregation and divide by time window.',
+    'histogram': 'Histogram requires manual implementation using summarize with bin() grouping',
+    'funnel': 'Funnel analysis requires decomposition into sequential countIf() steps',
+    'apdex': 'Apdex requires decomposition: (countIf(duration < T) + countIf(duration >= T and duration < 4T) * 0.5) / count()',
+    'percentage': 'Percentage requires decomposition: 100.0 * countIf(condition) / count()',
   };
 
   /**
@@ -60,61 +60,69 @@ export class NRQLToDQLTranslator {
   private static readonly EVENT_TYPE_MAP: Record<string, EventTypeMapping> = {
     'transaction': {
       eventType: 'Transaction',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "apm"',
-      notes: 'APM transaction data',
+      dqlFetch: 'fetch spans',
+      notes: 'APM transaction data maps to distributed tracing spans',
     },
     'transactionerror': {
       eventType: 'TransactionError',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "apm" and isError == true',
-      notes: 'APM error data',
+      dqlFetch: 'fetch spans',
+      filter: 'error == true',
+      notes: 'APM error data - spans with error flag',
     },
     'log': {
       eventType: 'Log',
       dqlFetch: 'fetch logs',
       notes: 'Log data',
     },
+    'logevent': {
+      eventType: 'LogEvent',
+      dqlFetch: 'fetch logs',
+      notes: 'Log event data',
+    },
     'metric': {
       eventType: 'Metric',
       dqlFetch: 'fetch dt.metrics',
-      notes: 'Metric data - may require metric selector syntax',
+      notes: 'Metric data - uses timeseries command instead of fetch',
     },
     'pageview': {
       eventType: 'PageView',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "rum"',
-      notes: 'Browser/RUM page view data',
+      dqlFetch: 'fetch bizevents',
+      notes: 'Browser/RUM page view data maps to business events',
     },
     'pageaction': {
       eventType: 'PageAction',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "rum"',
-      notes: 'Browser/RUM user action data',
+      dqlFetch: 'fetch bizevents',
+      notes: 'Browser/RUM user action data maps to business events',
+    },
+    'browserinteraction': {
+      eventType: 'BrowserInteraction',
+      dqlFetch: 'fetch spans',
+      notes: 'Browser interaction data maps to spans',
     },
     'syntheticcheck': {
       eventType: 'SyntheticCheck',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "synthetic"',
-      notes: 'Synthetic monitoring data',
+      dqlFetch: 'fetch bizevents',
+      notes: 'Synthetic monitoring data maps to business events',
+    },
+    'syntheticrequest': {
+      eventType: 'SyntheticRequest',
+      dqlFetch: 'fetch bizevents',
+      notes: 'Synthetic request data maps to business events',
     },
     'systemsample': {
       eventType: 'SystemSample',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "infrastructure"',
-      notes: 'Infrastructure host metrics',
+      dqlFetch: 'fetch dt.metrics',
+      notes: 'Infrastructure host metrics - uses timeseries command',
     },
     'processsample': {
       eventType: 'ProcessSample',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "infrastructure"',
-      notes: 'Infrastructure process metrics',
+      dqlFetch: 'fetch dt.metrics',
+      notes: 'Infrastructure process metrics - uses timeseries command',
     },
     'networksample': {
       eventType: 'NetworkSample',
-      dqlFetch: 'fetch logs',
-      filter: 'log.source == "infrastructure"',
-      notes: 'Infrastructure network metrics',
+      dqlFetch: 'fetch dt.metrics',
+      notes: 'Infrastructure network metrics - uses timeseries command',
     },
     'span': {
       eventType: 'Span',
@@ -125,6 +133,31 @@ export class NRQLToDQLTranslator {
       eventType: 'DistributedTracingSpan',
       dqlFetch: 'fetch spans',
       notes: 'Distributed tracing spans',
+    },
+    'infrastructureevent': {
+      eventType: 'InfrastructureEvent',
+      dqlFetch: 'fetch events',
+      notes: 'Infrastructure events',
+    },
+    'nraiincident': {
+      eventType: 'NrAiIncident',
+      dqlFetch: 'fetch bizevents',
+      notes: 'Alert/incident data maps to business events',
+    },
+    'k8spodsample': {
+      eventType: 'K8sPodSample',
+      dqlFetch: 'fetch dt.metrics',
+      notes: 'Kubernetes pod metrics - uses timeseries with dt.kubernetes.pod.* metrics',
+    },
+    'k8scontainersample': {
+      eventType: 'K8sContainerSample',
+      dqlFetch: 'fetch dt.metrics',
+      notes: 'Kubernetes container metrics - uses timeseries with dt.kubernetes.container.* metrics',
+    },
+    'k8snodesample': {
+      eventType: 'K8sNodeSample',
+      dqlFetch: 'fetch dt.metrics',
+      notes: 'Kubernetes node metrics - uses timeseries with dt.kubernetes.node.* metrics',
     },
   };
 
@@ -916,11 +949,11 @@ export class NRQLToDQLTranslator {
     const metricFunctionMap: Record<string, { dql: string; warning?: string }> = {
       'latest': {
         dql: 'avg',
-        warning: 'latest() converted to avg() - DQL timeseries does not support last(). Consider if avg() provides acceptable results for your use case.',
+        warning: 'latest() converted to avg() - DQL timeseries does not support takeLast(). Consider if avg() provides acceptable results for your use case.',
       },
       'earliest': {
         dql: 'avg',
-        warning: 'earliest() converted to avg() - DQL timeseries does not support first(). Consider if avg() provides acceptable results for your use case.',
+        warning: 'earliest() converted to avg() - DQL timeseries does not support takeFirst(). Consider if avg() provides acceptable results for your use case.',
       },
       'average': { dql: 'avg' },
       'avg': { dql: 'avg' },
@@ -1099,19 +1132,30 @@ export class NRQLToDQLTranslator {
       // Dotted fields first (more specific)
       'service.name': 'service.name',  // preserve as-is
       'span.kind': 'span.kind',        // preserve as-is
+      'entity.name': 'dt.entity.name',
+      'entity.guid': 'entity.guid',    // preserve for filtering
       'http.method': 'http.request.method',
-      'http.url': 'http.url',
-      'http.statusCode': 'http.status_code',
+      'http.url': 'http.request.url',
+      'http.target': 'http.target',    // preserve as-is
+      'http.statusCode': 'http.response.status_code',
+      'http.status_code': 'http.response.status_code',
       'error.class': 'error.type',
       'error.message': 'error.message',
       'log.message': 'content',
       'log.level': 'loglevel',
       'request.uri': 'http.route',
       'request.method': 'http.request.method',
-      'response.status': 'http.status_code',
+      'response.status': 'http.response.status_code',
+      'parent.id': 'span.parent_id',
+      'trace.id': 'trace_id',
+      'db.name': 'db.name',           // preserve as-is
+      'db.system': 'db.system',       // preserve as-is
+      'db.statement': 'db.statement', // preserve as-is
+      'server.address': 'server.address', // preserve as-is
+      'db.namespace': 'db.namespace',     // preserve as-is
       // Simple fields (less specific) - use negative lookbehind for dot
       'timestamp': 'timestamp',
-      'duration': 'response_time',
+      'duration': 'duration',
       'totalTime': 'response_time',
       'webDuration': 'response_time',
       'databaseDuration': 'db.response_time',
@@ -1124,7 +1168,11 @@ export class NRQLToDQLTranslator {
       'entityGuid': 'dt.entity.service',
       'errorMessage': 'error.message',
       'errorType': 'error.type',
-      'httpResponseCode': 'http.status_code',
+      'httpResponseCode': 'http.response.status_code',
+      'cpuPercent': 'host.cpu.usage',
+      'memoryUsedPercent': 'host.mem.usage',
+      'memoryUsedBytes': 'host.mem.used',
+      'diskUsedPercent': 'host.disk.usage',
       'message': 'content',
       'level': 'loglevel',
       'severity': 'loglevel',
@@ -1146,6 +1194,10 @@ export class NRQLToDQLTranslator {
       'podName': 'k8s.pod.name',
       'namespaceName': 'k8s.namespace.name',
       'nodeName': 'k8s.node.name',
+      // Kubernetes container metrics
+      'k8s.container.cpuUsedCores': 'dt.kubernetes.container.cpu_usage',
+      'k8s.container.memoryUsedBytes': 'dt.kubernetes.container.memory_usage',
+      'k8s.container.restartCount': 'dt.kubernetes.container.restarts',
     };
 
     for (const [nrField, dtField] of Object.entries(standardMappings)) {
@@ -1173,8 +1225,9 @@ export class NRQLToDQLTranslator {
     }
 
     // IN -> in() with DQL array() function
+    // Field pattern includes dots to support dotted field names like entity.guid
     result = result.replace(
-      /(\w+)\s+IN\s*\(([^)]+)\)/gi,
+      /([a-zA-Z_][a-zA-Z0-9_.]*)\s+IN\s*\(([^)]+)\)/gi,
       (_, field, values) => {
         const valueList = values
           .split(',')
@@ -1186,7 +1239,7 @@ export class NRQLToDQLTranslator {
 
     // NOT IN -> NOT in() with DQL array() function
     result = result.replace(
-      /(\w+)\s+NOT\s+IN\s*\(([^)]+)\)/gi,
+      /([a-zA-Z_][a-zA-Z0-9_.]*)\s+NOT\s+IN\s*\(([^)]+)\)/gi,
       (_, field, values) => {
         const valueList = values
           .split(',')

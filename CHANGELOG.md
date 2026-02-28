@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.27] - 2026-02-28
+
+### Added
+- **Validation CLI command** (`validate`): Compares TypeScript translator output against Python compiler test data
+  - Reads `*_ast_test.json` files from TEMP directory (843 production queries across 11 dashboards)
+  - Generates match/mismatch reports with confidence scoring
+  - Supports `--verbose` for detailed mismatch output and `--output` for JSON report export
+- **Notebook generator CLI command** (`notebook`): Generates Dynatrace Notebook JSON for import into tenants
+  - Creates alternating markdown (NRQL) and runnable DQL query sections
+  - Supports `--source python|typescript|both` to choose DQL translation source
+  - Supports `--per-dashboard` for one notebook per dashboard file
+  - Supports `--max-queries` to limit sections per notebook
+  - Groups queries by dashboard page with section dividers
+- **New event type mappings**: `BrowserInteraction`, `InfrastructureEvent`, `NrAiIncident`, `LogEvent`, `SyntheticRequest`, `K8sPodSample`, `K8sContainerSample`, `K8sNodeSample`
+- **New field mappings**: `entity.name`, `http.response.status_code`, `http.request.url`, `cpuPercent`, `memoryUsedPercent`, `parent.id`, `trace.id`, K8s container metric fields
+
+### Changed
+- **`Transaction` now maps to `fetch spans`** instead of `fetch logs` (aligns with Python compiler and Dynatrace data model)
+- **`PageView`/`PageAction` now map to `fetch bizevents`** instead of `fetch logs`
+- **`SystemSample`/`ProcessSample`/`NetworkSample` now map to `fetch dt.metrics`** (infrastructure metrics use timeseries)
+- `stddev` moved from unsupported to supported functions (DQL natively supports `stddev()`)
+- `latest()` now maps to `takeLast()` (correct DQL function name)
+- `earliest()` now maps to `takeFirst()` (correct DQL function name)
+- `uniqueCount()` now maps to `countDistinctExact()` for exact cardinality
+- `duration` field now preserves as `duration` instead of mapping to `response_time`
+- `http.statusCode` now maps to `http.response.status_code` (full DT field name)
+- `http.url` now maps to `http.request.url`
+- IN operator now supports dotted field names (e.g., `entity.guid IN (...)`)
+- Improved unsupported function messages with decomposition hints
+
+### Fixed
+- IN operator regex now handles dotted field names like `entity.guid`
+
 ## [1.0.26] - 2025-02-05
 
 ### Added
