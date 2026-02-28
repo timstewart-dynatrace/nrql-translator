@@ -1,113 +1,126 @@
-# NRQL Translator - Claude Instructions
+# CLAUDE.md
 
-> **DISCLAIMER**: This information was AI generated and is provided "as-is" without warranty. It was generated as an independent, community-driven project and **not supported by Dynatrace**. Always refer to official [Dynatrace documentation](https://docs.dynatrace.com/docs) for the most current information.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-
-NRQL to DQL Translator - Converts New Relic Query Language queries to Dynatrace Query Language for migration purposes.
+> **DISCLAIMER**: This is an independent, community-driven project and **not supported by Dynatrace**. Refer to official [Dynatrace documentation](https://docs.dynatrace.com/docs) for authoritative DQL information.
 
 ## Architecture
 
-### Components
+This repo contains **two sibling projects** sharing a duplicated translation engine:
 
-1. **Core Translation Engine** (`nrql-translator/src/core/`)
-   - `NRQLToDQLTranslator.ts` - Main translator class
-   - `types.ts` - TypeScript type definitions
+- **Library/CLI** (`nrql-translator/`) — TypeScript library + Commander.js CLI for batch Excel translation
+- **Dynatrace App** (`nrql-translator-app/nrql-translator/`) — React UI using Strato Design System, deployed via `dt-app`
 
-2. **CLI** (`nrql-translator/src/cli/`)
-   - Excel file processing for batch translations
-   - Command-line interface using Commander.js
-
-3. **Dynatrace App** (`nrql-translator-app/nrql-translator/`)
-   - React-based web UI
-   - Uses Dynatrace Strato components
-   - Deployed to Dynatrace tenant
+**Critical**: The core translator is duplicated. Logic changes must be synced to both:
+- `nrql-translator/src/core/NRQLToDQLTranslator.ts` (canonical)
+- `nrql-translator-app/nrql-translator/src/app/utils/NRQLToDQLTranslator.ts` (copy)
+- Same applies to `types.ts` in both locations.
 
 ### Translation Flow
 
-1. Parse NRQL query into components (SELECT, FROM, WHERE, FACET, etc.)
-2. Map NRQL functions to DQL equivalents
-3. Map event types to DQL data sources
-4. Convert operators and field names
-5. Generate DQL output with notes and warnings
+`NRQLToDQLTranslator.translate(nrql)` → `TranslationResult { dql, notes, confidence, warnings }`
 
-## Development
+1. Normalize query (strip comments, backticks, whitespace)
+2. Parse NRQL into components (SELECT, FROM, WHERE, FACET, TIMESERIES, ORDER BY, LIMIT, COMPARE WITH, SLIDE BY)
+3. Map event types via `EVENT_TYPE_MAP` → DQL `fetch` command
+4. Map functions via `FUNCTION_MAP` → DQL aggregations
+5. Convert operators and field names via `mapFieldNames()` and `convertOperators()`
+6. Generate DQL with confidence scoring (high/medium/low)
 
-### Build Commands
+### Key Internal Patterns
+
+- **Depth-aware parsing**: All clause keyword detection (WHERE, FACET, SELECT, etc.) uses `findClauseKeyword()` / `extractUntilClauseKeyword()` which track parenthesis depth. Never use regex to match clause keywords — it fails when keywords appear inside function args like `filter(count(*), WHERE ...)`.
+- **Static mapping tables**: `FUNCTION_MAP`, `UNSUPPORTED_FUNCTIONS`, `EVENT_TYPE_MAP` — prefer updating these before adding new parser logic.
+- **Arithmetic expressions**: `parseAggregationFunction()` has three detection paths: Pattern 1 (outer parens), Pattern 2 (func OP number), arithmetic continuation (func OP func). All produce `_arithmetic_` type handled by `translateArithmeticExpressionParts()`.
+- **COMPARE WITH**: Generates `append [subquery]` with time-shifted timestamps. The `current_` prefix regex must use `(?<![=!<>])=(?!=)` to avoid corrupting `==`/`>=`/`<=`/`!=` inside expressions.
+
+## Build & Test Commands
 
 ```bash
-# CLI Library
+# Library/CLI (run from nrql-translator/)
 cd nrql-translator
-npm run build        # Build library
-npm run build:cli    # Build CLI
-npm run build:all    # Build both
-npm test            # Run tests
+npm run build          # Compile TS → dist/
+npm run build:cli      # Compile CLI → dist-cli/
+npm run build:all      # Both
+npm test               # Jest (133+ tests)
+npm run lint           # ESLint
+npm run lint:fix       # ESLint with auto-fix
+npm run typecheck      # tsc --noEmit
+npm run cli            # Build + run CLI
 
-# Dynatrace App
+# Dynatrace App (run from nrql-translator-app/nrql-translator/)
 cd nrql-translator-app/nrql-translator
-npm run start       # Development server
-npm run deploy      # Deploy to tenant
+npm run start          # dt-app dev (hot reload)
+npm run build          # dt-app build
+npm run deploy         # dt-app deploy to tenant
 ```
 
-### Version Management
+### Running a Single Test
 
-**MANDATORY**: Increment version on EVERY change:
+```bash
+cd nrql-translator
+npx jest --testNamePattern="filter.*arithmetic"   # by test name pattern
+npx jest --verbose                                 # see all test names
+```
 
-1. Update `nrql-translator/package.json`
-2. Update `nrql-translator-app/nrql-translator/app.config.json`
-3. Update `APP_VERSION` constant in `Translator.tsx`
-4. Update `CHANGELOG.md`
+### Test Structure
+
+- Tests: `nrql-translator/test/unit/translator.test.ts`
+- Fixtures: `nrql-translator/test/fixtures/queries.json` (arrays of `{name, nrql, expectedDqlContains}`)
+- Tests use pattern-based assertions (`expect(result.dql).toContain(...)`) rather than exact string matching
+
+## Version Management
+
+**MANDATORY** — increment on EVERY change, in all 4 locations:
+
+1. `nrql-translator/package.json` → `"version"`
+2. `nrql-translator-app/nrql-translator/app.config.json` → `"version"`
+3. `nrql-translator-app/nrql-translator/ui/app/pages/Translator.tsx` → `APP_VERSION` constant
+4. `.claude/CLAUDE.md` → version below
+5. `CHANGELOG.md` → new entry (Keep a Changelog format)
 
 Current version: **1.0.33**
 
-### Testing
+## Workflow
 
-- Run `npm test` before committing
-- All tests must pass
-- Add tests for new functionality
-
-## Code Style
-
-- TypeScript with strict mode
-- ESLint for linting
-- Prettier for formatting
-- Use functional patterns where appropriate
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `nrql-translator/src/core/NRQLToDQLTranslator.ts` | Main translation logic |
-| `nrql-translator/src/core/types.ts` | Type definitions |
-| `nrql-translator-app/.../Translator.tsx` | UI component (contains APP_VERSION) |
-| `nrql-translator/package.json` | CLI library version |
-| `app.config.json` | Dynatrace app version |
+1. Create feature branch: `feature/X.Y.Z-description`
+2. Make changes (sync translator to both projects if modified)
+3. Run tests: `cd nrql-translator && npm test`
+4. Update version in all 4 locations + CHANGELOG.md
+5. Commit with descriptive message
+6. Merge to main with `--no-ff`
 
 ## Common Tasks
 
 ### Add New Function Mapping
 
-Edit `NRQLToDQLTranslator.ts`:
+Edit `NRQLToDQLTranslator.ts` — add to `FUNCTION_MAP`:
 ```typescript
-private static readonly FUNCTION_MAP: Record<string, { dql: string; notes?: string }> = {
-  // Add new mapping here
-  'newfunction': { dql: 'dqlequivalent', notes: 'optional notes' },
-};
+'newfunction': { dql: 'dqlequivalent', notes: 'optional notes' },
 ```
 
 ### Add New Event Type Mapping
 
-Edit `NRQLToDQLTranslator.ts`:
+Edit `NRQLToDQLTranslator.ts` — add to `EVENT_TYPE_MAP`:
 ```typescript
-private static readonly EVENT_TYPE_MAP: Record<string, EventTypeMapping> = {
-  // Add new mapping here
-  'neweventtype': {
-    eventType: 'NewEventType',
-    dqlFetch: 'fetch logs',
-    filter: 'optional filter',
-    notes: 'description',
-  },
-};
+'neweventtype': {
+  eventType: 'NewEventType',
+  dqlFetch: 'fetch logs',
+  filter: 'optional filter',
+  notes: 'description',
+},
+```
+
+### Dynatrace App: Strato Imports
+
+Always import from category subpaths, never package root:
+```typescript
+// Correct
+import { Flex } from "@dynatrace/strato-components/layouts";
+import { Heading } from "@dynatrace/strato-components/typography";
+
+// Wrong — will cause bundle issues
+import { Flex, Heading } from "@dynatrace/strato-components";
 ```
 
 ## Key DQL Syntax Rules
@@ -118,13 +131,3 @@ private static readonly EVENT_TYPE_MAP: Record<string, EventTypeMapping> = {
 | Equality | `field == "value"` | `field = 'value'` |
 | IN operator | `in(field, array("a", "b"))` | `field IN ('a', 'b')` |
 | Named params | `round(val, decimals: 2)` | `round(val, 2)` |
-
-## Workflow
-
-1. Create feature branch with version: `feature/X.Y.Z-description`
-2. Make changes
-3. Run tests: `npm test`
-4. Update version in all three locations (package.json, app.config.json, Translator.tsx)
-5. Update CHANGELOG.md
-6. Commit with descriptive message
-7. Merge to main with `--no-ff`
