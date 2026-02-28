@@ -108,6 +108,9 @@ export interface ParsedNRQL {
 
   /** WITH TIMEZONE specification */
   timezone: string | null;
+
+  /** SLIDE BY interval (sliding window) */
+  slideBy: string | null;
 }
 
 /**

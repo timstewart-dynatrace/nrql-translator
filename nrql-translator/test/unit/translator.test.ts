@@ -620,4 +620,146 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.dql).toContain('append');
     });
   });
+
+  describe('CASES + COMPARE WITH bug fixes', () => {
+    it('should not include stray comma in CASES label', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Span FACET CASES(where status = 200 AS success, where status != 200 AS failure) TIMESERIES"
+      );
+      expect(result.dql).toContain('"success"');
+      expect(result.dql).toContain('"failure"');
+      expect(result.dql).not.toContain('"success,"');
+    });
+
+    it('should apply CASES transformation in COMPARE WITH append block', () => {
+      const result = translator.translate(
+        "SELECT rate(count(*), 1 minute) FROM AjaxRequest WHERE requestUrl IN ('example.com/api') FACET httpResponseCode, CASES(where enduser.id = 'GUESTUSER' AS guest, where enduser.id != 'GUESTUSER' AS customer) TIMESERIES COMPARE WITH 1 week ago"
+      );
+      // Both primary and append blocks should have fieldsAdd with if()
+      const fieldsAddCount = (result.dql.match(/fieldsAdd case_result/g) || []).length;
+      expect(fieldsAddCount).toBeGreaterThanOrEqual(2);
+      // Append block should NOT contain raw CASES()
+      expect(result.dql).not.toContain('by:{httpResponseCode, CASES(');
+    });
+
+    it('should apply field mapping in COMPARE WITH append block', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM AjaxRequest FACET httpResponseCode TIMESERIES COMPARE WITH 1 week ago"
+      );
+      // Both primary and append should use mapped field name
+      const appendBlock = result.dql.split('append [')[1];
+      expect(appendBlock).toContain('http.response.status_code');
+      expect(appendBlock).not.toContain('httpResponseCode');
+    });
+  });
+
+  describe('filter() NRQL aggregate function', () => {
+    it('should translate filter(count(*), WHERE cond) to countIf', () => {
+      const result = translator.translate(
+        "SELECT filter(count(*), WHERE error IS TRUE) FROM Transaction"
+      );
+      expect(result.dql).toContain('countIf(');
+      expect(result.confidence).toBe('high');
+    });
+
+    it('should translate filter(average(field), WHERE cond) to avg(if(cond, field))', () => {
+      const result = translator.translate(
+        "SELECT filter(average(duration), WHERE appName LIKE '%api%') AS 'API Avg Duration' FROM Transaction"
+      );
+      expect(result.dql).toContain('avg(if(');
+      expect(result.dql).toContain('API Avg Duration');
+    });
+
+    it('should handle multiple filter() aggregations', () => {
+      const result = translator.translate(
+        "SELECT filter(count(*), WHERE error IS TRUE) AS errors, filter(count(*), WHERE duration > 5) AS slow FROM Transaction"
+      );
+      expect(result.dql).toContain('errors = countIf(');
+      expect(result.dql).toContain('slow = countIf(');
+    });
+  });
+
+  describe('hourOf()/dateOf()/weekOf() in FACET', () => {
+    it('should translate hourOf(timestamp) to getHour()', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction FACET hourOf(timestamp)"
+      );
+      expect(result.dql).toContain('fieldsAdd hour = getHour(timestamp)');
+      expect(result.dql).toContain('by:{hour}');
+    });
+
+    it('should translate dateOf(timestamp) to formatTimestamp()', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction FACET dateOf(timestamp)"
+      );
+      expect(result.dql).toContain('fieldsAdd date = formatTimestamp(timestamp');
+      expect(result.dql).toContain('by:{date}');
+    });
+
+    it('should translate weekOf(timestamp) to getWeekOfYear()', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction FACET weekOf(timestamp)"
+      );
+      expect(result.dql).toContain('fieldsAdd week = getWeekOfYear(timestamp)');
+      expect(result.dql).toContain('by:{week}');
+    });
+
+    it('should handle hourOf() alongside regular fields', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction FACET hourOf(timestamp), appName"
+      );
+      expect(result.dql).toContain('fieldsAdd hour = getHour(timestamp)');
+      expect(result.dql).toContain('by:{hour, service.name}');
+    });
+  });
+
+  describe('SLIDE BY warning', () => {
+    it('should warn about SLIDE BY not being supported', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction TIMESERIES 30 minutes SLIDE BY 10 minutes"
+      );
+      expect(result.warnings.some(w => w.includes('SLIDE BY'))).toBe(true);
+      expect(result.dql).toContain('makeTimeseries');
+    });
+  });
+
+  describe('ago() time function', () => {
+    it('should translate ago(7 days) to now() - 7d', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction WHERE timestamp >= ago(7 days)"
+      );
+      expect(result.dql).toContain('now() - 7d');
+      expect(result.dql).not.toContain('ago(');
+    });
+
+    it('should translate ago(24 hours) to now() - 24h', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction WHERE timestamp >= ago(24 hours) AND environment = 'production'"
+      );
+      expect(result.dql).toContain('now() - 24h');
+      expect(result.dql).toContain('environment == "production"');
+    });
+  });
+
+  describe('CASES + COMPARE WITH production queries', () => {
+    it('should translate AjaxRequest CASES + COMPARE WITH correctly', () => {
+      const result = translator.translate(
+        "SELECT rate(count(*), 1 minute) FROM AjaxRequest WHERE requestUrl IN ('usfoodsproduction10upnbvk4.org.coveo.com/rest/organizations/usfoodsproduction10upnbvk4/commerce/v2/search/productsuggest') FACET httpResponseCode, CASES(where enduser.id = 'GUESTUSER' AS guest, where enduser.id != 'GUESTUSER' AS customer) TIMESERIES COMPARE WITH 1 week ago"
+      );
+      expect(result.dql).toContain('fetch bizevents');
+      expect(result.dql).toContain('fieldsAdd case_result = if(');
+      expect(result.dql).toContain('by:{http.response.status_code, case_result}');
+      expect(result.dql).toContain('append');
+      expect(result.confidence).toBe('high');
+    });
+
+    it('should translate Span CASES + COMPARE WITH with backtick fields', () => {
+      const result = translator.translate(
+        "SELECT rate(count(*), 1 minute) FROM Span WHERE http.route = '/product-domain-api/v2/products' AND span.kind = 'server' FACET http.status_code, CASES(where `prod-usf-product-domain-api.accessToken.userName` = 'GUESTUSER' AS guest, where `prod-usf-product-domain-api.accessToken.userName` != 'GUESTUSER' AS customer) TIMESERIES COMPARE WITH 1 week ago"
+      );
+      expect(result.dql).toContain('fetch spans');
+      expect(result.dql).toContain('fieldsAdd case_result = if(');
+      expect(result.dql).toContain('append');
+    });
+  });
 });
