@@ -762,4 +762,77 @@ describe('NRQLToDQLTranslator', () => {
       expect(result.dql).toContain('append');
     });
   });
+
+  describe('filter() arithmetic expressions', () => {
+    it('should translate filter()/filter() division AS alias', () => {
+      const result = translator.translate(
+        "FROM Transaction SELECT filter(sum(duration), WHERE appName = 'checkout') / filter(count(*), WHERE appName = 'checkout') AS 'Manual Avg' WHERE environment = 'production'"
+      );
+      expect(result.dql).toContain('Manual Avg');
+      expect(result.dql).toContain('countIf(');
+      expect(result.dql).toContain('sum(if(');
+      expect(result.dql).toContain('/');
+      expect(result.dql).not.toContain('filter(');
+    });
+
+    it('should translate parenthesized filter arithmetic with multiplier', () => {
+      const result = translator.translate(
+        "FROM Transaction SELECT (filter(count(*), WHERE error IS TRUE) / count(*)) * 100 AS 'Error %' WHERE environment = 'production'"
+      );
+      expect(result.dql).toContain('Error %');
+      expect(result.dql).toContain('countIf(');
+      expect(result.dql).toContain('count()');
+      expect(result.dql).toContain('* 100');
+      expect(result.dql).not.toContain('filter(');
+    });
+
+    it('should translate filter() subtraction (delta)', () => {
+      const result = translator.translate(
+        "FROM Transaction SELECT filter(average(duration), WHERE httpResponseCode >= 500) - filter(average(duration), WHERE httpResponseCode < 400) AS 'Error vs Success Delta' WHERE environment = 'production'"
+      );
+      expect(result.dql).toContain('Error vs Success Delta');
+      expect(result.dql).toContain('avg(if(');
+      expect(result.dql).toContain('-');
+      expect(result.dql).not.toContain('filter(');
+    });
+
+    it('should translate filter(percentile(field, N)) preserving percentile value', () => {
+      const result = translator.translate(
+        "FROM Transaction SELECT filter(percentile(duration, 95), WHERE request.method = 'POST') AS 'POST p95' WHERE environment = 'production'"
+      );
+      expect(result.dql).toContain('POST p95');
+      expect(result.dql).toContain('percentile(if(');
+      expect(result.dql).toContain(', 95)');
+      expect(result.dql).not.toContain('filter(');
+    });
+
+    it('should translate the full multi-filter production query', () => {
+      const result = translator.translate(
+        "FROM Transaction SELECT filter(sum(duration), WHERE appName = 'checkout') / filter(count(*), WHERE appName = 'checkout') AS 'Manual Avg', (filter(count(*), WHERE error IS TRUE) / count(*)) * 100 AS 'Error %', filter(average(duration), WHERE httpResponseCode >= 500) - filter(average(duration), WHERE httpResponseCode < 400) AS 'Error vs Success Delta', filter(percentile(duration, 95), WHERE request.method = 'POST') AS 'POST p95', filter(percentile(duration, 95), WHERE request.method = 'GET') AS 'GET p95' WHERE environment = 'production' AND appName IN ('checkout', 'auth', 'inventory') AND timestamp >= ago(24 hours) FACET appName, request.method TIMESERIES 15 minutes COMPARE WITH 1 week ago"
+      );
+      expect(result.dql).toContain('fetch spans');
+      // All filter() calls should be decomposed
+      expect(result.dql).not.toContain('filter(');
+      // Should contain countIf for count(*) filters
+      expect(result.dql).toContain('countIf(');
+      // Should contain percentile with if() and the percentile value
+      expect(result.dql).toContain('percentile(if(');
+      expect(result.dql).toContain(', 95)');
+      // Should have COMPARE WITH append block
+      expect(result.dql).toContain('append');
+      // Should translate ago()
+      expect(result.dql).toContain('now() - 24h');
+    });
+
+    it('should handle FROM...SELECT with filter() containing WHERE without truncation', () => {
+      const result = translator.translate(
+        "FROM Transaction SELECT filter(count(*), WHERE error IS TRUE) AS 'Errors', count(*) AS 'Total' WHERE environment = 'production' FACET appName"
+      );
+      expect(result.dql).toContain('Errors');
+      expect(result.dql).toContain('Total');
+      expect(result.dql).toContain('countIf(');
+      expect(result.dql).toContain('count()');
+      expect(result.dql).not.toContain('filter(');
+    });
+  });
 });
