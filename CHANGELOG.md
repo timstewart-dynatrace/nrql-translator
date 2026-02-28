@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.28] - 2026-02-28
+
+### Added
+- **"Open in Notebook" button**: Sends translated DQL directly to Dynatrace Notebooks via `sendIntent()` from `@dynatrace-sdk/navigation`
+- **"Open with..." button**: Opens Dynatrace's standard app picker dialog, allowing users to send the DQL query to any compatible app
+- Both buttons appear alongside the existing "Copy DQL" button after translation
+
 ## [1.0.27] - 2026-02-28
 
 ### Added
