@@ -283,10 +283,14 @@ export class NRQLToDQLTranslator {
   }
 
   /**
-   * Normalize query for parsing (handle case, whitespace)
+   * Normalize query for parsing (handle case, whitespace, comments, backtick identifiers)
    */
   private normalizeQuery(nrql: string): string {
-    return nrql.trim().replace(/\s+/g, ' ');
+    // Strip NRQL line comments (-- to end of line)
+    let result = nrql.replace(/--.*$/gm, '');
+    // Strip backtick quoting from identifiers (NRQL uses backticks for field names)
+    result = result.replace(/`/g, '');
+    return result.trim().replace(/\s+/g, ' ');
   }
 
   /**
@@ -1270,49 +1274,69 @@ export class NRQLToDQLTranslator {
   /**
    * Convert LIKE operator to DQL equivalent
    * Note: Field pattern includes dots to support dotted field names like http.target
+   * IMPORTANT: NOT LIKE must be processed BEFORE LIKE to prevent 'NOT' being captured as a field name
    */
   private convertLikeOperator(expr: string, notes: TranslationNotes): string {
     let result = expr;
     // Pattern to match field names including dots (e.g., http.target, service.name)
     const fieldPattern = '([a-zA-Z_][a-zA-Z0-9_.]*)';
 
-    // Simple patterns with % wildcards (contains)
+    // *** NOT LIKE patterns MUST come first ***
+    // NOT LIKE '%text%' -> not(contains(field, "text"))
+    result = result.replace(
+      new RegExp(`${fieldPattern}\\s+NOT\\s+LIKE\\s+['"]%([^%'"]+)%['"]`, 'gi'),
+      'not(contains($1, "$2"))'
+    );
+
+    // NOT LIKE 'text%' -> not(startsWith(field, "text"))
+    result = result.replace(
+      new RegExp(`${fieldPattern}\\s+NOT\\s+LIKE\\s+['"]([^%'"]+)%['"]`, 'gi'),
+      'not(startsWith($1, "$2"))'
+    );
+
+    // NOT LIKE '%text' -> not(endsWith(field, "text"))
+    result = result.replace(
+      new RegExp(`${fieldPattern}\\s+NOT\\s+LIKE\\s+['"]%([^%'"]+)['"]`, 'gi'),
+      'not(endsWith($1, "$2"))'
+    );
+
+    // NOT LIKE complex pattern -> not(matchesValue(field, "regex"))
+    result = result.replace(
+      new RegExp(`${fieldPattern}\\s+NOT\\s+LIKE\\s+['"](.+?)['"]`, 'gi'),
+      (_match, field, pattern) => {
+        const regexPattern = pattern.replace(/%/g, '.*').replace(/_/g, '.');
+        return `not(matchesValue(${field}, "${regexPattern}"))`;
+      }
+    );
+
+    // *** Regular LIKE patterns (after NOT LIKE) ***
+    // LIKE '%text%' -> contains(field, "text")
     result = result.replace(
       new RegExp(`${fieldPattern}\\s+LIKE\\s+['"]%([^%'"]+)%['"]`, 'gi'),
       'contains($1, "$2")'
     );
 
-    // Starts with pattern
+    // LIKE 'text%' -> startsWith(field, "text")
     result = result.replace(
       new RegExp(`${fieldPattern}\\s+LIKE\\s+['"]([^%'"]+)%['"]`, 'gi'),
       'startsWith($1, "$2")'
     );
 
-    // Ends with pattern
+    // LIKE '%text' -> endsWith(field, "text")
     result = result.replace(
       new RegExp(`${fieldPattern}\\s+LIKE\\s+['"]%([^%'"]+)['"]`, 'gi'),
       'endsWith($1, "$2")'
     );
 
-    // Complex patterns - use matchesValue
+    // LIKE complex pattern -> matchesValue(field, "regex")
     result = result.replace(
       new RegExp(`${fieldPattern}\\s+LIKE\\s+['"](.+?)['"]`, 'gi'),
       (_match, field, pattern) => {
-        // Convert SQL LIKE pattern to regex
         const regexPattern = pattern.replace(/%/g, '.*').replace(/_/g, '.');
         notes.keyDifferences.push(
           `LIKE pattern converted to regex: "${pattern}" -> "${regexPattern}"`
         );
         return `matchesValue(${field}, "${regexPattern}")`;
-      }
-    );
-
-    // NOT LIKE
-    result = result.replace(
-      new RegExp(`${fieldPattern}\\s+NOT\\s+LIKE\\s+['"](.+?)['"]`, 'gi'),
-      (_match, field, pattern) => {
-        const regexPattern = pattern.replace(/%/g, '.*').replace(/_/g, '.');
-        return `NOT matchesValue(${field}, "${regexPattern}")`;
       }
     );
 

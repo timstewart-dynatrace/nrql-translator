@@ -172,6 +172,31 @@
       "name": "OR condition",
       "nrql": "SELECT count(*) FROM Transaction WHERE status = 200 OR status = 201",
       "expectedDqlContains": ["filter", "or"]
+    },
+    {
+      "name": "NOT LIKE starts with",
+      "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE 'ADS returned%'",
+      "expectedDqlContains": ["filter", "not(startsWith(content"]
+    },
+    {
+      "name": "NOT LIKE contains",
+      "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE '%error%'",
+      "expectedDqlContains": ["filter", "not(contains(content"]
+    },
+    {
+      "name": "Multiple NOT LIKE",
+      "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE 'query:%' AND message NOT LIKE 'Calling%'",
+      "expectedDqlContains": ["filter", "not(startsWith(content", "and"]
+    },
+    {
+      "name": "Backtick-quoted field",
+      "nrql": "SELECT count(*) FROM Log WHERE `container_name` = 'my-api'",
+      "expectedDqlContains": ["filter", "container_name == \"my-api\""]
+    },
+    {
+      "name": "Backtick-quoted field with IN",
+      "nrql": "SELECT count(*) FROM Log WHERE `level` IN ('info', 'warn')",
+      "expectedDqlContains": ["filter", "in(loglevel, array("]
     }
   ],
   "orderAndLimit": [
