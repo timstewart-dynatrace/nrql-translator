@@ -1,6 +1,8 @@
 # Ignore spl-translator directory
 spl-translator/
 
+TEMP/ 
+
 # Node modules
 node_modules/
 

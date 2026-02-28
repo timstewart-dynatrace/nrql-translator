@@ -7,6 +7,8 @@
 
 import { Command } from 'commander';
 import { executeTranslate } from './commands/translate';
+import { executeValidate, ValidateCommandOptions } from './commands/validate';
+import { executeNotebook, NotebookCommandOptions } from './commands/notebook';
 import { TranslateCommandOptions } from './types';
 import { NRQLToDQLTranslator } from '../core/NRQLToDQLTranslator';
 
@@ -122,6 +124,50 @@ program
       }
 
       console.log('');
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('validate')
+  .description('Validate TypeScript translator against Python compiler test data')
+  .argument('<input>', 'Path to *_ast_test.json file or directory containing them')
+  .option('-o, --output <file>', 'Save detailed comparison report as JSON')
+  .option('--verbose', 'Show details for each mismatch', false)
+  .option('--limit <n>', 'Limit number of queries per file', parseInt)
+  .action(async (input: string, options: Partial<ValidateCommandOptions>) => {
+    try {
+      await executeValidate(input, {
+        output: options.output,
+        verbose: options.verbose ?? false,
+        limit: options.limit,
+      });
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('notebook')
+  .description('Generate Dynatrace Notebook JSON from NRQL test data')
+  .argument('<input>', 'Path to *_ast_test.json file or directory containing them')
+  .option('-o, --output <file>', 'Output file path (or directory with --per-dashboard)')
+  .option('--per-dashboard', 'Generate one notebook per dashboard file', false)
+  .option('--max-queries <n>', 'Maximum queries per notebook', parseInt)
+  .option('--source <type>', 'DQL source: "typescript", "python", or "both"', 'python')
+  .option('--verbose', 'Show detailed generation stats', false)
+  .action(async (input: string, options: Partial<NotebookCommandOptions>) => {
+    try {
+      await executeNotebook(input, {
+        output: options.output,
+        perDashboard: options.perDashboard ?? false,
+        maxQueries: options.maxQueries,
+        source: (options.source as 'typescript' | 'python' | 'both') ?? 'python',
+        verbose: options.verbose ?? false,
+      });
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : error);
       process.exit(1);

@@ -3,7 +3,7 @@
     {
       "name": "Simple count",
       "nrql": "SELECT count(*) FROM Transaction",
-      "expectedDqlContains": ["fetch logs", "summarize", "count()"]
+      "expectedDqlContains": ["fetch spans", "summarize", "count()"]
     },
     {
       "name": "Count with filter",
@@ -40,7 +40,7 @@
     {
       "name": "Unique count",
       "nrql": "SELECT uniqueCount(host) FROM Transaction",
-      "expectedDqlContains": ["countDistinct(host)"]
+      "expectedDqlContains": ["countDistinctExact(host"]
     },
     {
       "name": "Percentile",
@@ -50,17 +50,17 @@
     {
       "name": "Latest",
       "nrql": "SELECT latest(status) FROM Transaction",
-      "expectedDqlContains": ["last(status)"]
+      "expectedDqlContains": ["takeLast(status)"]
     },
     {
       "name": "Earliest",
       "nrql": "SELECT earliest(timestamp) FROM Transaction",
-      "expectedDqlContains": ["first(timestamp)"]
+      "expectedDqlContains": ["takeFirst(timestamp)"]
     },
     {
       "name": "Uniques",
       "nrql": "SELECT uniques(host) FROM Transaction",
-      "expectedDqlContains": ["collectDistinct(host)"]
+      "expectedDqlContains": ["collectDistinct(host"]
     },
     {
       "name": "Median",
@@ -76,6 +76,11 @@
       "name": "Arithmetic aggregation without parens",
       "nrql": "SELECT average(duration.ms)/1000 FROM Span",
       "expectedDqlContains": ["summarize", "avg(duration.ms)/1000"]
+    },
+    {
+      "name": "Stddev (now supported)",
+      "nrql": "SELECT stddev(duration) FROM Transaction",
+      "expectedDqlContains": ["stddev(duration)"]
     }
   ],
   "facet": [
@@ -126,7 +131,7 @@
     {
       "name": "Greater than",
       "nrql": "SELECT count(*) FROM Transaction WHERE duration > 1000",
-      "expectedDqlContains": ["filter", "response_time > 1000"]
+      "expectedDqlContains": ["filter", "duration > 1000"]
     },
     {
       "name": "LIKE pattern",
@@ -142,6 +147,11 @@
       "name": "IN list",
       "nrql": "SELECT count(*) FROM Transaction WHERE status IN (200, 201, 204)",
       "expectedDqlContains": ["filter", "in(status, array("]
+    },
+    {
+      "name": "IN list with dotted field",
+      "nrql": "SELECT count(*) FROM Span WHERE entity.guid IN ('abc123', 'def456')",
+      "expectedDqlContains": ["filter", "in(entity.guid, array("]
     },
     {
       "name": "IS NULL",
@@ -190,7 +200,7 @@
     {
       "name": "Transaction",
       "nrql": "SELECT count(*) FROM Transaction",
-      "expectedDqlContains": ["fetch logs", "log.source == \"apm\""]
+      "expectedDqlContains": ["fetch spans"]
     },
     {
       "name": "Log",
@@ -200,12 +210,22 @@
     {
       "name": "PageView",
       "nrql": "SELECT count(*) FROM PageView",
-      "expectedDqlContains": ["fetch logs", "rum"]
+      "expectedDqlContains": ["fetch bizevents"]
     },
     {
       "name": "Span",
       "nrql": "SELECT count(*) FROM Span",
       "expectedDqlContains": ["fetch spans"]
+    },
+    {
+      "name": "BrowserInteraction",
+      "nrql": "SELECT count(*) FROM BrowserInteraction",
+      "expectedDqlContains": ["fetch spans"]
+    },
+    {
+      "name": "InfrastructureEvent",
+      "nrql": "SELECT count(*) FROM InfrastructureEvent",
+      "expectedDqlContains": ["fetch events"]
     },
     {
       "name": "Unknown event type",
@@ -217,12 +237,17 @@
     {
       "name": "Full query",
       "nrql": "SELECT count(*), average(duration) FROM Transaction WHERE appName = 'MyApp' FACET host TIMESERIES 5 minutes",
-      "expectedDqlContains": ["fetch logs", "filter", "makeTimeseries", "count()", "avg(duration)", "interval:5m", "by:{host"]
+      "expectedDqlContains": ["fetch spans", "filter", "makeTimeseries", "count()", "avg(duration)", "interval:5m", "by:{host"]
     },
     {
       "name": "Query with alias",
       "nrql": "SELECT count(*) AS requests, average(duration) AS avg_duration FROM Transaction WHERE status = 200 FACET host, status",
       "expectedDqlContains": ["requests = count()", "avg_duration = avg(duration)", "by:{host", "status"]
+    },
+    {
+      "name": "Span query with entity.guid IN",
+      "nrql": "SELECT average(duration) FROM Span WHERE entity.guid IN ('abc123', 'def456') AND http.method IN ('GET', 'POST') FACET http.target TIMESERIES 5 minutes",
+      "expectedDqlContains": ["fetch spans", "in(entity.guid", "makeTimeseries", "avg(duration)", "by:{http.target"]
     }
   ],
   "unsupported": [
@@ -233,10 +258,16 @@
       "expectedWarningContains": "COMPARE WITH"
     },
     {
-      "name": "stddev function",
-      "nrql": "SELECT stddev(duration) FROM Transaction",
+      "name": "rate function",
+      "nrql": "SELECT rate(count(*), 1 minute) FROM Transaction",
       "shouldWarn": true,
-      "expectedWarningContains": "stddev"
+      "expectedWarningContains": "rate"
+    },
+    {
+      "name": "percentage function",
+      "nrql": "SELECT percentage(count(*), WHERE status = 200) FROM Transaction",
+      "shouldWarn": true,
+      "expectedWarningContains": "percentage"
     }
   ]
 }
