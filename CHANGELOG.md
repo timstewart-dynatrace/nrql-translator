@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.36] - 2026-03-10
+
+### Changed
+- **`LIKE '%text%'` now translates to `matchesPhrase()`** instead of `contains()` — token-based phrase matching is more appropriate for DQL log queries
+- **`NOT LIKE '%text%'` now translates to `not(matchesPhrase())`** instead of `not(contains())`
+- **`message` field no longer mapped to `content`** — `message` passes through as-is since OpenPipeline may store parsed log fields under their original names (e.g., `data.message`)
+
 ## [1.0.35] - 2026-03-10
 
 ### Removed

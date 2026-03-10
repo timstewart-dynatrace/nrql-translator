@@ -571,22 +571,22 @@ describe('NRQLToDQLTranslator', () => {
       const result = translator.translate(
         "SELECT count(*) FROM Log WHERE message NOT LIKE 'ADS returned%'"
       );
-      expect(result.dql.toLowerCase()).toContain('not(startswith(content');
+      expect(result.dql.toLowerCase()).toContain('not(startswith(message');
       expect(result.dql).not.toContain('startsWith(NOT');
     });
 
-    it('should translate NOT LIKE contains pattern', () => {
+    it('should translate NOT LIKE matchesPhrase pattern', () => {
       const result = translator.translate(
         "SELECT count(*) FROM Log WHERE message NOT LIKE '%error%'"
       );
-      expect(result.dql.toLowerCase()).toContain('not(contains(content');
+      expect(result.dql.toLowerCase()).toContain('not(matchesphrase(message');
     });
 
     it('should handle multiple NOT LIKE in same query', () => {
       const result = translator.translate(
         "SELECT count(*) FROM Log WHERE message NOT LIKE 'query:%' AND message NOT LIKE 'Calling%' AND returnedCount > 0"
       );
-      expect(result.dql.toLowerCase()).toContain('not(startswith(content');
+      expect(result.dql.toLowerCase()).toContain('not(startswith(message');
       expect(result.dql).toContain('returnedCount > 0');
       expect(result.dql).not.toContain('startsWith(NOT');
     });
