@@ -219,7 +219,7 @@ export class NRQLToDQLTranslator {
     'memoryUsedPercent': 'host.mem.usage',
     'memoryUsedBytes': 'host.mem.used',
     'diskUsedPercent': 'host.disk.usage',
-    'message': 'content',
+    'message': 'message',
     'level': 'loglevel',
     'severity': 'loglevel',
     // Kubernetes fields
@@ -1392,10 +1392,10 @@ export class NRQLToDQLTranslator {
     const fieldPattern = '([a-zA-Z_][a-zA-Z0-9_.]*)';
 
     // *** NOT LIKE patterns MUST come first ***
-    // NOT LIKE '%text%' -> not(contains(field, "text"))
+    // NOT LIKE '%text%' -> not(matchesPhrase(field, "text"))
     result = result.replace(
       new RegExp(`${fieldPattern}\\s+NOT\\s+LIKE\\s+['"]%([^%'"]+)%['"]`, 'gi'),
-      'not(contains($1, "$2"))'
+      'not(matchesPhrase($1, "$2"))'
     );
 
     // NOT LIKE 'text%' -> not(startsWith(field, "text"))
@@ -1420,10 +1420,10 @@ export class NRQLToDQLTranslator {
     );
 
     // *** Regular LIKE patterns (after NOT LIKE) ***
-    // LIKE '%text%' -> contains(field, "text")
+    // LIKE '%text%' -> matchesPhrase(field, "text")
     result = result.replace(
       new RegExp(`${fieldPattern}\\s+LIKE\\s+['"]%([^%'"]+)%['"]`, 'gi'),
-      'contains($1, "$2")'
+      'matchesPhrase($1, "$2")'
     );
 
     // LIKE 'text%' -> startsWith(field, "text")
@@ -1699,7 +1699,7 @@ export class NRQLToDQLTranslator {
   /**
    * Translate NRQL filter() aggregate function
    * filter(count(*), WHERE error IS TRUE) → countIf(error == true)
-   * filter(average(duration), WHERE appName LIKE '%api%') → avg(if(contains(service.name, "api"), duration))
+   * filter(average(duration), WHERE appName LIKE '%api%') → avg(if(matchesPhrase(service.name, "api"), duration))
    */
   private translateFilterFunction(
     agg: AggregationFunction,

@@ -136,7 +136,7 @@
     {
       "name": "LIKE pattern",
       "nrql": "SELECT count(*) FROM Transaction WHERE name LIKE '%payment%'",
-      "expectedDqlContains": ["filter", "contains"]
+      "expectedDqlContains": ["filter", "matchesPhrase"]
     },
     {
       "name": "LIKE with dotted field name",
@@ -176,17 +176,17 @@
     {
       "name": "NOT LIKE starts with",
       "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE 'ADS returned%'",
-      "expectedDqlContains": ["filter", "not(startsWith(content"]
+      "expectedDqlContains": ["filter", "not(startsWith(message"]
     },
     {
       "name": "NOT LIKE contains",
       "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE '%error%'",
-      "expectedDqlContains": ["filter", "not(contains(content"]
+      "expectedDqlContains": ["filter", "not(matchesPhrase(message"]
     },
     {
       "name": "Multiple NOT LIKE",
       "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE 'query:%' AND message NOT LIKE 'Calling%'",
-      "expectedDqlContains": ["filter", "not(startsWith(content", "and"]
+      "expectedDqlContains": ["filter", "not(startsWith(message", "and"]
     },
     {
       "name": "Backtick-quoted field",

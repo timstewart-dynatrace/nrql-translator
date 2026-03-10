@@ -106,9 +106,9 @@ This project provides two ways to translate NRQL queries to DQL:
 | NRQL | DQL |
 |------|-----|
 | `=` | `==` |
-| `LIKE '%text%'` | `contains(field, "text")` |
+| `LIKE '%text%'` | `matchesPhrase(field, "text")` |
 | `LIKE 'text%'` | `startsWith(field, "text")` |
-| `NOT LIKE '%text%'` | `not(contains(field, "text"))` |
+| `NOT LIKE '%text%'` | `not(matchesPhrase(field, "text"))` |
 | `IN ('a', 'b')` | `in(field, array("a", "b"))` |
 | `IS NULL` | `isNull(field)` |
 | `IS NOT NULL` | `isNotNull(field)` |
