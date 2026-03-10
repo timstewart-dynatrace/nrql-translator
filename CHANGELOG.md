@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.35] - 2026-03-10
+
+### Removed
+- **Deleted legacy `src/app/` directory** from Dynatrace App — was an unused duplicate of `ui/app/` that caused translator sync drift (the stale `src/` copy was missing all v1.0.33+ features including `dateOf()`, `hourOf()`, and time-grouping functions)
+
+### Fixed
+- **App translator now uses correct source**: `ui/app/utils/NRQLToDQLTranslator.ts` is the single app copy, synced with canonical library version
+- **`tsconfig.json`** updated from `"include": ["src"]` to `"include": ["ui"]` to match actual app structure
+- **`index.html`** script entry point updated from `/src/app/index.tsx` to `/ui/main.tsx`
+
+### Changed
+- Updated all documentation (CLAUDE.md, README.md) to reference `ui/app/` instead of `src/app/` as the app translator location
+
 ## [1.0.34] - 2026-02-28
 
 ### Fixed

@@ -206,14 +206,15 @@ nrql-translator/
 │       └── fixtures/
 ├── nrql-translator-app/       # Dynatrace App
 │   └── nrql-translator/
-│       ├── src/app/
+│       ├── ui/app/
 │       │   ├── pages/         # Translator UI
+│       │   ├── components/    # Header, Card components
 │       │   └── utils/         # Synced copy of translation engine
 │       └── app.config.json
 └── docs/                      # Documentation
 ```
 
-> **Note**: The translation engine in `nrql-translator-app/` is a synced copy of the canonical source in `nrql-translator/src/core/`. Changes must be made in the canonical version first and then synced.
+> **Note**: The translation engine in `nrql-translator-app/nrql-translator/ui/app/utils/` is a synced copy of the canonical source in `nrql-translator/src/core/`. Changes must be made in the canonical version first and then synced.
 
 ## License
 
