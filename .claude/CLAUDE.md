@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Translates New Relic NRQL queries to Dynatrace DQL. Provides a TypeScript library for programmatic use, a Commander.js CLI for batch Excel translation, and a Dynatrace App UI for interactive translation. Powered by the AST-based `@timstewart-dynatrace/nrql-engine` (292 compiled patterns, 677 engine tests).
 
-- **Version:** 1.1.0
+- **Version:** 1.0.36 (1.1.0 pending — see Phase 04)
 
 **Last Updated:** 2026-04-10
 
@@ -38,7 +38,7 @@ The translation engine lives in a separate repo: `/Users/Shared/GitHub/nrql-engi
 | Component | Details |
 |-----------|---------|
 | Translator | AST-based `NRQLCompiler` from engine (292 patterns) |
-| Adapter | Thin ~60-line wrapper mapping `CompileResult` → `TranslationResult` |
+| Adapter | Thin adapter (~60-100 lines) mapping `CompileResult` → `TranslationResult` |
 | Code location | Single engine package; thin adapters in library and app |
 | Test coverage | 677 engine tests + 133 integration tests |
 
