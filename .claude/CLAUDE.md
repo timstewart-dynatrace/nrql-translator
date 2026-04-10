@@ -11,9 +11,9 @@ This repo contains **two sibling projects** that will share a common engine:
 - **Library/CLI** (`nrql-translator/`) — TypeScript library + Commander.js CLI for batch Excel translation
 - **Dynatrace App** (`nrql-translator-app/nrql-translator/`) — React UI using Strato Design System, deployed via `dt-app`
 
-### Engine Migration (IN PROGRESS)
+### Engine Migration (COMPLETE)
 
-The translation engine is being replaced. See `.claude/phases/` for the step-by-step plan.
+The translation engine has been replaced. See `.claude/phases/` for the completed plan.
 
 | Component | Old (current) | New (target) |
 |-----------|--------------|--------------|
@@ -24,12 +24,9 @@ The translation engine is being replaced. See `.claude/phases/` for the step-by-
 
 **Engine source:** `/Users/Shared/GitHub/DMA_NewRelic/` (PR #1 on GitHub)
 
-### Current Code Duplication (to be eliminated in Phase 01)
+### Code Duplication (eliminated in Phase 01)
 
-The core translator is currently duplicated. Until Phase 01 is complete, logic changes must be synced to both:
-- `nrql-translator/src/core/NRQLToDQLTranslator.ts` (canonical)
-- `nrql-translator-app/nrql-translator/ui/app/utils/NRQLToDQLTranslator.ts` (app copy)
-- Same applies to `types.ts` in both locations.
+The core translator is no longer duplicated. Both the library and the Dynatrace app are thin adapters (~60 lines each) around the shared `@timstewart-dynatrace/nrql-engine` package. Translation logic changes go into the engine package only.
 
 ### Translation Flow
 
@@ -52,7 +49,7 @@ See `.claude/phases/` for detailed plans:
 
 | Phase | Goal | Status |
 |-------|------|--------|
-| 01 | Publish engine, wire library + app, eliminate duplication | Pending |
+| 01 | Publish engine, wire library + app, eliminate duplication | Done |
 | 02 | Align tests, close coverage gaps, calibrate confidence | Pending |
 | 03 | CLI and app feature parity (notes, validator, fixer) | Pending |
 | 04 | Version bump, release, deploy | Pending |

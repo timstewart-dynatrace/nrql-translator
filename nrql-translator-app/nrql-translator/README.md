@@ -88,6 +88,10 @@ After deployment, the app will be available in your Dynatrace environment under 
 - LIMIT
 - ORDER BY
 
+### Translation Engine
+
+This app uses the shared `@timstewart-dynatrace/nrql-engine` package (AST-based compiler with 292 patterns). The app is a thin adapter that maps engine results to the UI.
+
 ### Aggregation Functions
 | NRQL | DQL |
 |------|-----|
@@ -96,21 +100,28 @@ After deployment, the app will be available in your Dynatrace environment under 
 | sum(field) | sum(field) |
 | min(field) | min(field) |
 | max(field) | max(field) |
-| uniqueCount(field) | countDistinct(field) |
+| uniqueCount(field) | countDistinctExact(field) |
 | percentile(field, n) | percentile(field, n) |
-| latest(field) | last(field) |
-| earliest(field) | first(field) |
+| latest(field) | takeLast(field) |
+| earliest(field) | takeFirst(field) |
 | uniques(field) | collectDistinct(field) |
 | median(field) | percentile(field, 50) |
+| filter(count(*), WHERE c) | countIf(c) |
+| filter(avg(f), WHERE c) | avg(if(c, f)) |
+| rate(count(*), 1 min) | count() |
+| percentage(count(*), WHERE c) | 100.0 * countIf(c) / count() |
 
 ### Event Type Mapping
 | New Relic | Dynatrace |
 |-----------|-----------|
-| Transaction | fetch logs (APM) |
-| Log | fetch logs |
+| Transaction | fetch spans |
+| Log / LogEvent | fetch logs |
 | Span | fetch spans |
-| PageView | fetch logs (RUM) |
-| Metric | fetch dt.metrics |
+| PageView / PageAction | fetch bizevents |
+| Metric | timeseries command |
+| SyntheticCheck | fetch bizevents |
+| SystemSample / ProcessSample | fetch dt.metrics |
+| K8sPodSample / K8sContainerSample | fetch dt.metrics |
 
 ## Troubleshooting
 

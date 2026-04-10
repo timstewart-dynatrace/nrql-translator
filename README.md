@@ -214,7 +214,7 @@ nrql-translator/
 └── docs/                      # Documentation
 ```
 
-> **Note**: The translation engine in `nrql-translator-app/nrql-translator/ui/app/utils/` is a synced copy of the canonical source in `nrql-translator/src/core/`. Changes must be made in the canonical version first and then synced.
+> **Note**: Both the CLI library and the Dynatrace app are thin adapters (~60 lines each) around the shared `@timstewart-dynatrace/nrql-engine` package. Translation logic changes go into the engine only — no syncing required.
 
 ## License
 

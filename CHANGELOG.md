@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replaced 2,197-line regex translator with AST engine adapter (~60 lines each)
+- Library and app both use @timstewart-dynatrace/nrql-engine (292 patterns)
+- Eliminated code duplication between library and Dynatrace app
+- Updated all 133 test assertions to match engine output
+
 ## [1.0.36] - 2026-03-10
 
 ### Changed
