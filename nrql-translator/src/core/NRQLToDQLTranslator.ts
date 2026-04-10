@@ -51,7 +51,9 @@ export class NRQLToDQLTranslator {
         dql: `// Translation error: ${result.error}\n// Original NRQL: ${nrql}`,
         notes: emptyNotes(),
         confidence: 'low',
+        confidenceScore: 0,
         warnings: [result.error],
+        fixes: [],
       };
     }
 
@@ -66,7 +68,9 @@ export class NRQLToDQLTranslator {
       dql,
       notes: mapNotes(result.notes),
       confidence: result.confidence.toLowerCase() as 'high' | 'medium' | 'low',
+      confidenceScore: result.confidenceScore,
       warnings: result.warnings,
+      fixes: result.fixes ?? [],
     };
   }
 }

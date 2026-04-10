@@ -13,6 +13,7 @@ import { executeValidate, ValidateCommandOptions } from './commands/validate';
 import { executeNotebook, NotebookCommandOptions } from './commands/notebook';
 import { TranslateCommandOptions } from './types';
 import { NRQLToDQLTranslator } from '../core/NRQLToDQLTranslator';
+import { DQLSyntaxValidator, DQLFixer } from '@timstewart-dynatrace/nrql-engine';
 
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8'));
 const program = new Command();
@@ -69,7 +70,9 @@ program
   .description('Translate a single NRQL query')
   .argument('<nrql>', 'NRQL query string')
   .option('--verbose', 'Show detailed translation notes', false)
-  .action((nrql: string, options: { verbose: boolean }) => {
+  .option('--validate', 'Validate the generated DQL syntax', false)
+  .option('--fix', 'Auto-fix common DQL issues in the output', false)
+  .action((nrql: string, options: { verbose: boolean; validate: boolean; fix: boolean }) => {
     try {
       const translator = new NRQLToDQLTranslator();
       const result = translator.translate(nrql);
@@ -78,12 +81,47 @@ program
       console.log(nrql);
       console.log('\nDQL:');
       console.log(result.dql);
-      console.log(`\nConfidence: ${result.confidence}`);
+      console.log(`\nConfidence: ${result.confidence} (${result.confidenceScore}/100)`);
+
+      if (result.fixes.length > 0) {
+        console.log('\nAuto-corrections:');
+        for (const fix of result.fixes) {
+          console.log(`  - ${fix}`);
+        }
+      }
 
       if (result.warnings.length > 0) {
         console.log('\nWarnings:');
         for (const warning of result.warnings) {
           console.log(`  - ${warning}`);
+        }
+      }
+
+      if (options.fix) {
+        const fixer = new DQLFixer();
+        const [fixedDql, appliedFixes] = fixer.validateAndFix(result.dql);
+        if (appliedFixes.length > 0) {
+          console.log('\nDQL Fixer applied:');
+          for (const fix of appliedFixes) {
+            console.log(`  - ${fix}`);
+          }
+          console.log('\nFixed DQL:');
+          console.log(fixedDql);
+        } else {
+          console.log('\nDQL Fixer: no issues found.');
+        }
+      }
+
+      if (options.validate) {
+        const validator = new DQLSyntaxValidator();
+        const validation = validator.validate(result.dql);
+        if (validation.valid) {
+          console.log('\nDQL Validation: PASSED');
+        } else {
+          console.log('\nDQL Validation: FAILED');
+          for (const err of validation.errors) {
+            console.log(`  - ${err}`);
+          }
         }
       }
 
@@ -93,6 +131,13 @@ program
         if (result.notes.dataSourceMapping.length > 0) {
           console.log('\n  Data Source Mapping:');
           for (const note of result.notes.dataSourceMapping) {
+            console.log(`    - ${note}`);
+          }
+        }
+
+        if (result.notes.fieldExtraction.length > 0) {
+          console.log('\n  Field Extraction:');
+          for (const note of result.notes.fieldExtraction) {
             console.log(`    - ${note}`);
           }
         }

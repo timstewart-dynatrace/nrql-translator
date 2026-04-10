@@ -190,7 +190,7 @@ export const Translator = () => {
                       fontWeight: "bold",
                     }}
                   >
-                    [{result.confidence.toUpperCase()} confidence]
+                    [{result.confidence.toUpperCase()} confidence — {result.confidenceScore}/100]
                   </Text>
                 </Flex>
                 <Flex alignItems="center" gap={8}>
@@ -209,6 +209,21 @@ export const Translator = () => {
               <Code>{result.dql}</Code>
             </Flex>
           </Surface>
+
+          {result.fixes.length > 0 && (
+            <Surface>
+              <Flex flexDirection="column" gap={8} padding={16}>
+                <Text style={{ fontWeight: "bold" }}>Auto-corrections</Text>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {result.fixes.map((fix, index) => (
+                    <li key={index}>
+                      <Text>{fix}</Text>
+                    </li>
+                  ))}
+                </ul>
+              </Flex>
+            </Surface>
+          )}
 
           {result.warnings.length > 0 && (
             <Surface>
@@ -247,12 +262,57 @@ export const Translator = () => {
             </Surface>
           )}
 
+          {result.notes.fieldExtraction.length > 0 && (
+            <Surface>
+              <Flex flexDirection="column" gap={8} padding={16}>
+                <Text style={{ fontWeight: "bold" }}>Field Extraction</Text>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {result.notes.fieldExtraction.map((note, index) => (
+                    <li key={index}>
+                      <Text>{note}</Text>
+                    </li>
+                  ))}
+                </ul>
+              </Flex>
+            </Surface>
+          )}
+
           {result.notes.keyDifferences.length > 0 && (
             <Surface>
               <Flex flexDirection="column" gap={8} padding={16}>
                 <Text style={{ fontWeight: "bold" }}>Key Differences</Text>
                 <ul style={{ margin: 0, paddingLeft: 20 }}>
                   {result.notes.keyDifferences.map((note, index) => (
+                    <li key={index}>
+                      <Text>{note}</Text>
+                    </li>
+                  ))}
+                </ul>
+              </Flex>
+            </Surface>
+          )}
+
+          {result.notes.performanceConsiderations.length > 0 && (
+            <Surface>
+              <Flex flexDirection="column" gap={8} padding={16}>
+                <Text style={{ fontWeight: "bold" }}>Performance Considerations</Text>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {result.notes.performanceConsiderations.map((note, index) => (
+                    <li key={index}>
+                      <Text>{note}</Text>
+                    </li>
+                  ))}
+                </ul>
+              </Flex>
+            </Surface>
+          )}
+
+          {result.notes.dataModelRequirements.length > 0 && (
+            <Surface>
+              <Flex flexDirection="column" gap={8} padding={16}>
+                <Text style={{ fontWeight: "bold" }}>Data Model Requirements</Text>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {result.notes.dataModelRequirements.map((note, index) => (
                     <li key={index}>
                       <Text>{note}</Text>
                     </li>
