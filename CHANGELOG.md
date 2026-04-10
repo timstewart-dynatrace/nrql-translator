@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SLIDE BY translates to rolling() window (previously only warned)
 - CASES supports 3+ condition branches with nested if()
 - Conformed .claude/ to VisualCode AI Template standard (settings.json, DECISIONS.md, architecture.md, 9 foundation rule files)
+- `confidenceScore` (0-100) and `fixes` (auto-corrections) exposed in TranslationResult
+- CLI `query --validate` flag: validates generated DQL syntax via DQLSyntaxValidator
+- CLI `query --fix` flag: auto-fixes common DQL issues via DQLFixer
+- CLI `query` now shows confidence score (e.g., "high (95/100)") and auto-corrections
+- App UI now displays all 6 translation note sections (was 3/6: added fieldExtraction, performanceConsiderations, dataModelRequirements)
+- App UI shows confidence score alongside confidence level
+- App UI shows auto-corrections section when fixes are applied
 
 ## [1.0.36] - 2026-03-10
 

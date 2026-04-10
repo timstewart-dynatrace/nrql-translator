@@ -429,7 +429,14 @@ describe('NRQLToDQLTranslator', () => {
       expect(result).toHaveProperty('dql');
       expect(result).toHaveProperty('notes');
       expect(result).toHaveProperty('confidence');
+      expect(result).toHaveProperty('confidenceScore');
       expect(result).toHaveProperty('warnings');
+      expect(result).toHaveProperty('fixes');
+
+      expect(typeof result.confidenceScore).toBe('number');
+      expect(result.confidenceScore).toBeGreaterThanOrEqual(0);
+      expect(result.confidenceScore).toBeLessThanOrEqual(100);
+      expect(Array.isArray(result.fixes)).toBe(true);
 
       expect(result.notes).toHaveProperty('dataSourceMapping');
       expect(result.notes).toHaveProperty('fieldExtraction');

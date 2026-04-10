@@ -22,8 +22,14 @@ export interface TranslationResult {
   /** Confidence level of the translation */
   confidence: 'high' | 'medium' | 'low';
 
+  /** Numeric confidence score (0-100) */
+  confidenceScore: number;
+
   /** Warnings about potential issues */
   warnings: string[];
+
+  /** Auto-corrections applied during translation */
+  fixes: string[];
 }
 
 /**
