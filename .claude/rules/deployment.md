@@ -31,6 +31,6 @@
 ## Rollback
 
 ```bash
-npm unpublish @bhdynatrace/nrql-translator@X.Y.Z  # if within 72h
+npm unpublish @timstewart-dynatrace/nrql-translator@X.Y.Z  # if within 72h
 # Or publish a patched version
 ```

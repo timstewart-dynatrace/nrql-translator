@@ -27,7 +27,7 @@ Replace the 2,197-line regex-based NRQLToDQLTranslator with the AST-based engine
 - [x] Delete `nrql-translator-app/nrql-translator/ui/app/utils/NRQLToDQLTranslator.ts` (76KB copy)
 - [x] Delete `nrql-translator-app/nrql-translator/ui/app/utils/types.ts` (copy)
 - [x] Import from the published engine package OR from the sibling library
-  - Option A: `import { NRQLToDQLTranslator } from '@bhdynatrace/nrql-translator'` (the library re-exports)
+  - Option A: `import { NRQLToDQLTranslator } from '@timstewart-dynatrace/nrql-translator'` (the library re-exports)
   - Option B: Direct engine import if dt-app bundler supports it
 - [x] Update `Translator.tsx` to use the new import path
 - [x] Test with `npm run start` (dt-app dev server)

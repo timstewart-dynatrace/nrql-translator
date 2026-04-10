@@ -1,5 +1,5 @@
 {
-  "name": "@bhdynatrace/nrql-translator",
+  "name": "@timstewart-dynatrace/nrql-translator",
   "version": "1.1.0",
   "description": "NRQL to DQL translation library for New Relic to Dynatrace migration",
   "main": "dist/index.js",
