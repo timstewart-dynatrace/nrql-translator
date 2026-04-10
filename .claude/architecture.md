@@ -4,21 +4,18 @@
 
 ```
 nrql-translator/
-├── nrql-translator/                  # TypeScript library + CLI
-│   ├── src/
-│   │   ├── core/
-│   │   │   ├── NRQLToDQLTranslator.ts   # Thin adapter (~100 lines) wrapping engine
-│   │   │   ├── types.ts                  # Public TranslationResult interface
-│   │   │   └── index.ts                  # Exports
-│   │   └── cli/
-│   │       └── index.ts                  # Commander.js CLI (query, excel commands)
-│   ├── test/
-│   │   ├── unit/translator.test.ts       # 151 integration tests
-│   │   └── fixtures/queries.json         # Test fixtures
-│   ├── dist/                             # Compiled library output
-│   ├── dist-cli/                         # Compiled CLI output
-│   └── package.json
-│
+├── src/
+│   ├── core/
+│   │   ├── NRQLToDQLTranslator.ts   # Thin adapter (~100 lines) wrapping engine
+│   │   ├── types.ts                  # Public TranslationResult interface
+│   │   └── index.ts                  # Exports
+│   └── cli/
+│       └── index.ts                  # Commander.js CLI (query, excel commands)
+├── test/
+│   ├── unit/translator.test.ts       # 151 integration tests
+│   └── fixtures/queries.json         # Test fixtures
+├── dist/                             # Compiled library output
+├── dist-cli/                         # Compiled CLI output
 ├── .claude/                          # AI assistant instructions
 │   ├── CLAUDE.md                     # Main entry point
 │   ├── DECISIONS.md                  # Decision log
@@ -26,7 +23,7 @@ nrql-translator/
 │   ├── settings.json                 # Project metadata
 │   ├── phases/                       # Phase tracking
 │   └── rules/                        # Domain-specific rules
-│
+├── package.json
 ├── CHANGELOG.md
 ├── README.md
 └── CLAUDE.md                         # Root pointer → .claude/CLAUDE.md
@@ -47,10 +44,10 @@ nrql-translator/
   ├── DQLSyntaxValidator              ← Validates generated DQL
   └── DQLFixer                        ← Auto-corrects common DQL issues
          ↓
-Adapter Layer (nrql-translator/src/core/)
+Adapter Layer (src/core/)
   └── NRQLToDQLTranslator            ← Maps CompileResult → TranslationResult
          ↓
-CLI (nrql-translator/src/cli/)        ← Batch Excel translation, single query
+CLI (src/cli/)                        ← Batch Excel translation, single query
 ```
 
 ## Data Flow

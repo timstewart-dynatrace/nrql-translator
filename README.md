@@ -159,7 +159,6 @@ See [docs/QUICK_START.md](docs/QUICK_START.md) for detailed usage instructions.
 ### CLI
 
 ```bash
-cd nrql-translator
 npm install
 npm run build:all
 
@@ -190,18 +189,17 @@ See [INSTALLATION.md](INSTALLATION.md) for detailed build and installation instr
 
 ```
 nrql-translator/
-├── nrql-translator/           # CLI library
-│   ├── src/
-│   │   ├── core/              # Adapter wrapping @timstewart-dynatrace/nrql-engine
-│   │   │   ├── NRQLToDQLTranslator.ts  # ~100 line adapter
-│   │   │   └── types.ts
-│   │   └── cli/               # Command-line interface
-│   │       ├── commands/      # excel, query, validate, notebook
-│   │       └── index.ts
-│   └── test/                  # Integration tests (151 tests)
-│       ├── unit/
-│       └── fixtures/
-└── docs/                      # Documentation
+├── src/
+│   ├── core/              # Adapter wrapping @timstewart-dynatrace/nrql-engine
+│   │   ├── NRQLToDQLTranslator.ts  # ~100 line adapter
+│   │   └── types.ts
+│   └── cli/               # Command-line interface
+│       ├── commands/      # excel, query, validate, notebook
+│       └── index.ts
+├── test/                  # Integration tests (151 tests)
+│   ├── unit/
+│   └── fixtures/
+└── docs/                  # Documentation
 ```
 
 > **Note**: Both the CLI library and the Dynatrace app are thin adapters (~60 lines each) around the shared `@timstewart-dynatrace/nrql-engine` package. Translation logic changes go into the engine only — no syncing required.
