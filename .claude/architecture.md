@@ -7,7 +7,7 @@ nrql-translator/
 ├── nrql-translator/                  # TypeScript library + CLI
 │   ├── src/
 │   │   ├── core/
-│   │   │   ├── NRQLToDQLTranslator.ts   # Thin adapter (~60 lines) wrapping engine
+│   │   │   ├── NRQLToDQLTranslator.ts   # Thin adapter (~100 lines) wrapping engine
 │   │   │   ├── types.ts                  # Public TranslationResult interface
 │   │   │   └── index.ts                  # Exports
 │   │   └── cli/
