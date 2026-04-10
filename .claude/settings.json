@@ -36,8 +36,6 @@
 
   "versionLocations": [
     "nrql-translator/package.json",
-    "nrql-translator-app/nrql-translator/app.config.json",
-    "nrql-translator-app/nrql-translator/ui/app/pages/Translator.tsx (APP_VERSION)",
     ".claude/CLAUDE.md"
   ],
 

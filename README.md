@@ -6,10 +6,9 @@ Translate New Relic Query Language (NRQL) queries to Dynatrace Query Language (D
 
 ## Overview
 
-This project provides two ways to translate NRQL queries to DQL:
+This project provides a TypeScript library and CLI for translating NRQL queries to DQL.
 
-1. **Dynatrace App** - A web-based UI that runs within your Dynatrace tenant
-2. **CLI Library** - A command-line tool for batch processing Excel files containing NRQL queries
+For the **Dynatrace App** (interactive web UI), see [nrql-translator-app](https://github.com/timstewart-dynatrace/nrql-translator-app).
 
 ## Features
 
@@ -157,15 +156,6 @@ DQL:  fetch spans
 
 See [docs/QUICK_START.md](docs/QUICK_START.md) for detailed usage instructions.
 
-### Dynatrace App
-
-```bash
-cd nrql-translator-app/nrql-translator
-npm install
-npm run start  # Development
-npm run deploy # Deploy to tenant
-```
-
 ### CLI
 
 ```bash
@@ -211,13 +201,6 @@ nrql-translator/
 │   └── test/                  # Integration tests (151 tests)
 │       ├── unit/
 │       └── fixtures/
-├── nrql-translator-app/       # Dynatrace App
-│   └── nrql-translator/
-│       ├── ui/app/
-│       │   ├── pages/         # Translator UI
-│       │   ├── components/    # Header, Card components
-│       │   └── utils/         # Adapter wrapping engine
-│       └── app.config.json
 └── docs/                      # Documentation
 ```
 

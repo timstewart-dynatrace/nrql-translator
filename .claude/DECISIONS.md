@@ -14,6 +14,14 @@ Log decisions **at the time** they're made, not retroactively. Decisions are app
 **Trade-offs:** Adds an external dependency. Engine changes require a publish cycle before this project can consume them. The dt-app bundler may not resolve npm packages the same way as Node.js.
 **Revisit if:** The engine package becomes unmaintained, or the dt-app bundler cannot resolve the package (fallback: re-export from library).
 
+## 2026-04-10 — Split Dynatrace App into separate repo
+
+**Chosen:** Move `nrql-translator-app/` to its own repo (`timstewart-dynatrace/nrql-translator-app`)
+**Alternatives:** Keep monorepo; have app depend on published library package
+**Why:** App and library were already functionally independent — app imports engine directly, not via library. No shared configs, no symlinks. Separate repos make ownership, versioning, and deployment clearer.
+**Trade-offs:** types.ts is duplicated in both repos. Changes to TranslationResult must be made in both places.
+**Revisit if:** Types diverge significantly — consider publishing a shared types package from the engine.
+
 ## 2026-04-10 — Thin adapter pattern for engine integration
 
 **Chosen:** ~60-line adapter wrapping `NRQLCompiler.compile()` → `TranslationResult`, preserving the existing public API

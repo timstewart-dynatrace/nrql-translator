@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Dynatrace App moved to separate repo: [nrql-translator-app](https://github.com/timstewart-dynatrace/nrql-translator-app)
+
 ## [1.1.0] - 2026-04-10
 
 ### Changed

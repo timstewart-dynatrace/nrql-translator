@@ -54,7 +54,6 @@ NRQLToDQLTranslator.translate(nrql)
 ## Essential Commands
 
 ```bash
-# Library/CLI (run from nrql-translator/)
 cd nrql-translator
 npm install            # Setup
 npm run build          # Compile TS → dist/
@@ -69,13 +68,6 @@ npm run cli            # Build + run CLI
 # Single test
 npx jest --testNamePattern="filter.*arithmetic"
 npx jest --verbose
-
-# Dynatrace App (run from nrql-translator-app/nrql-translator/)
-cd nrql-translator-app/nrql-translator
-npm install            # Setup
-npm run start          # dt-app dev (hot reload)
-npm run build          # dt-app build
-npm run deploy         # dt-app deploy to tenant
 ```
 
 ## Current Phase
@@ -100,10 +92,8 @@ See @.claude/rules/core.md for phase management details.
 @.claude/rules/debugging.md
 @.claude/rules/existing-code.md
 
-### Language & Framework
+### Language
 @.claude/rules/typescript.md
-@.claude/rules/frontend.md
-@.claude/rules/dynatrace-sdk.md
 
 ### Domain-specific (project rules)
 @.claude/rules/engine-integration.md
@@ -114,14 +104,14 @@ See @.claude/rules/core.md for phase management details.
 
 ## Quick Reference — Version Management
 
-**CRITICAL:** Update version in **4 places** before deployment:
+**CRITICAL:** Update version in **2 places** before deployment:
 
 1. `nrql-translator/package.json` → `"version"`
-2. `nrql-translator-app/nrql-translator/app.config.json` → `"version"`
-3. `nrql-translator-app/nrql-translator/ui/app/pages/Translator.tsx` → `APP_VERSION` constant
-4. `.claude/CLAUDE.md` → Version above
+2. `.claude/CLAUDE.md` → Version above
 
-All **MUST** match exactly. Also update `CHANGELOG.md` with changes.
+Also update `CHANGELOG.md` with changes.
+
+**Note:** The Dynatrace App is now in a separate repo: [nrql-translator-app](https://github.com/timstewart-dynatrace/nrql-translator-app)
 
 ## Key DQL Syntax Rules
 
@@ -142,17 +132,9 @@ Add to `nrql-engine/src/compiler/emitter.ts` FUNC_MAP, port tests, publish new e
 
 Add to `nrql-engine/src/compiler/emitter.ts` QUERY_CLASS_MAP. Publish and update dependency.
 
-### Dynatrace App: Strato Imports
+### Dynatrace App (separate repo)
 
-Always import from category subpaths, never package root:
-```typescript
-// Correct
-import { Flex } from "@dynatrace/strato-components/layouts";
-import { Heading } from "@dynatrace/strato-components/typography";
-
-// Wrong — will cause bundle issues
-import { Flex, Heading } from "@dynatrace/strato-components";
-```
+The Dynatrace App UI is now in its own repo: [nrql-translator-app](https://github.com/timstewart-dynatrace/nrql-translator-app)
 
 ## Decision Log
 
