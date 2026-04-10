@@ -14,7 +14,7 @@ import { sendIntent } from "@dynatrace-sdk/navigation";
 import { NRQLToDQLTranslator } from "../utils/NRQLToDQLTranslator";
 import { TranslationResult } from "../utils/types";
 
-const APP_VERSION = "1.0.36";
+const APP_VERSION = "1.1.0";
 
 export const Translator = () => {
   const [nrqlQuery, setNrqlQuery] = useState("");

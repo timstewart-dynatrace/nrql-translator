@@ -9,26 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-10
+
 ### Changed
 - Replaced 2,197-line regex translator with AST engine adapter (~60-100 lines each)
 - Library and app both use @timstewart-dynatrace/nrql-engine (292 patterns)
 - Eliminated code duplication between library and Dynatrace app
-- Updated all 133 test assertions to match engine output
+- Updated test assertions to match engine output (151 tests, up from 133)
+- SLIDE BY now translates to rolling() window (previously only warned)
 
 ### Added
-- Test coverage for formerly-unsupported patterns: histogram, funnel, apdex, subquery, SLIDE BY, CASES 3-way (18 new tests, 151 total)
+- Test coverage for formerly-unsupported patterns: histogram, funnel, apdex, subquery, SLIDE BY, CASES 3-way
 - Histogram translates to count() + bin() with warning
 - Funnel translates to countIf() decomposition with warning
 - Apdex translates to countIf() multi-step decomposition with warning
 - Subquery translates to lookup pattern
-- SLIDE BY translates to rolling() window (previously only warned)
 - CASES supports 3+ condition branches with nested if()
-- Conformed .claude/ to VisualCode AI Template standard (settings.json, DECISIONS.md, architecture.md, 9 foundation rule files)
-- `confidenceScore` (0-100) and `fixes` (auto-corrections) exposed in TranslationResult
+- `confidenceScore` (0-100) and `fixes` (auto-corrections) in TranslationResult API
 - CLI `query --validate` flag: validates generated DQL syntax via DQLSyntaxValidator
 - CLI `query --fix` flag: auto-fixes common DQL issues via DQLFixer
 - CLI `query` now shows confidence score (e.g., "high (95/100)") and auto-corrections
-- App UI now displays all 6 translation note sections (was 3/6: added fieldExtraction, performanceConsiderations, dataModelRequirements)
+- App UI displays all 6 translation note sections (was 3/6)
 - App UI shows confidence score alongside confidence level
 - App UI shows auto-corrections section when fixes are applied
 
