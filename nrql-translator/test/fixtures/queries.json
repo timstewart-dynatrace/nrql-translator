@@ -368,6 +368,61 @@
       "name": "CASES in FACET with two conditions",
       "nrql": "SELECT count(*) FROM Span FACET http.status_code, CASES(where enduser.id = 'GUESTUSER' AS guest, where enduser.id != 'GUESTUSER' AS 'customer') TIMESERIES",
       "expectedDqlContains": ["makeTimeseries", "fieldsAdd", "if(", "_category_"]
+    },
+    {
+      "name": "CASES with three conditions",
+      "nrql": "SELECT count(*) FROM Span FACET CASES(WHERE duration < 1 AS fast, WHERE duration >= 1 AND duration < 5 AS normal, WHERE duration >= 5 AS slow)",
+      "expectedDqlContains": ["summarize", "fieldsAdd", "if(", "_category_", "fast", "slow"]
+    }
+  ],
+  "histogramFunction": [
+    {
+      "name": "Basic histogram",
+      "nrql": "SELECT histogram(duration, 100, 10) FROM Transaction",
+      "expectedDqlContains": ["fetch spans", "summarize", "count()", "bin(duration"]
+    },
+    {
+      "name": "Histogram with FACET",
+      "nrql": "SELECT histogram(duration, 50, 5) FROM Span FACET service.name",
+      "expectedDqlContains": ["fetch spans", "summarize", "count()", "bin(duration", "service.name"]
+    }
+  ],
+  "funnelFunction": [
+    {
+      "name": "Basic funnel",
+      "nrql": "SELECT funnel(session, WHERE page = 'home', WHERE page = 'cart', WHERE page = 'checkout') FROM PageView",
+      "expectedDqlContains": ["fetch bizevents", "countIf("]
+    }
+  ],
+  "apdexFunction": [
+    {
+      "name": "Basic apdex",
+      "nrql": "SELECT apdex(duration, 0.5) FROM Transaction",
+      "expectedDqlContains": ["fetch spans", "countIf(", "count()"]
+    },
+    {
+      "name": "Apdex with FACET",
+      "nrql": "SELECT apdex(duration, 1.0) FROM Transaction FACET appName",
+      "expectedDqlContains": ["fetch spans", "countIf(", "count()", "service.name"]
+    }
+  ],
+  "subqueryFunction": [
+    {
+      "name": "Subquery with IN",
+      "nrql": "SELECT count(*) FROM Transaction WHERE host IN (SELECT uniques(host) FROM Transaction WHERE appName = 'MyApp')",
+      "expectedDqlContains": ["fetch spans", "lookup", "service.name"]
+    }
+  ],
+  "slideBy": [
+    {
+      "name": "SLIDE BY with interval",
+      "nrql": "SELECT count(*) FROM Transaction TIMESERIES 30 minutes SLIDE BY 10 minutes",
+      "expectedDqlContains": ["makeTimeseries", "rolling"]
+    },
+    {
+      "name": "SLIDE BY with FACET",
+      "nrql": "SELECT average(duration) FROM Span FACET service.name TIMESERIES 1 hour SLIDE BY 15 minutes",
+      "expectedDqlContains": ["makeTimeseries", "rolling", "by: {service.name"]
     }
   ]
 }
