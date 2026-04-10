@@ -42,4 +42,4 @@ When the engine publishes a new version:
 ### Dynatrace App bundling
 - The dt-app bundler may not resolve npm packages the same way as Node.js
 - If direct engine import fails in the app, re-export from the library package instead
-- The app imports from `@bhdynatrace/nrql-translator` (the library), which re-exports the engine
+- The app imports from `@timstewart-dynatrace/nrql-translator` (the library), which re-exports the engine

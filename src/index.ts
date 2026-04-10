@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { NRQLToDQLTranslator } from '@bhdynatrace/nrql-translator';
+ * import { NRQLToDQLTranslator } from '@timstewart-dynatrace/nrql-translator';
  *
  * const translator = new NRQLToDQLTranslator();
  * const result = translator.translate(
