@@ -15,7 +15,7 @@ Ensure the engine produces equivalent or better output for all existing nrql-tra
 ### Test fixture migration
 - [ ] Review `test/fixtures/queries.json` — are all patterns covered by engine's 292 tests?
 - [ ] Add any nrql-translator-specific patterns that are missing from the engine
-- [ ] Port new patterns upstream to DMA_NewRelic if generally useful
+- [ ] Port new patterns upstream to nrql-engine if generally useful
 
 ### New pattern coverage
 - [ ] Test all patterns the regex translator marked as UNSUPPORTED that the engine now handles:

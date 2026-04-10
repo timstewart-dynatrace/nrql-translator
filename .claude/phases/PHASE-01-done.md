@@ -2,14 +2,14 @@
 Status: DONE
 
 ## Goal
-Replace the 2,197-line regex-based NRQLToDQLTranslator with the AST-based engine from DMA_NewRelic. Eliminate code duplication between library and app.
+Replace the 2,197-line regex-based NRQLToDQLTranslator with the AST-based engine from nrql-engine. Eliminate code duplication between library and app.
 
 ## Tasks
 
 ### Publish the engine
-- [x] Merge DMA_NewRelic PR #1 (feature/engine-port) to main
-- [x] Tag DMA_NewRelic as v0.1.0
-- [x] Add npm publish config to DMA_NewRelic/package.json (scope: @timstewart-dynatrace/nrql-engine or similar)
+- [x] Merge nrql-engine PR #1 (feature/engine-port) to main
+- [x] Tag nrql-engine as v0.1.0
+- [x] Add npm publish config to nrql-engine/package.json (scope: @timstewart-dynatrace/nrql-engine or similar)
 - [x] Publish to GitHub Packages (same registry nrql-translator already uses)
 
 ### Wire the standalone library (nrql-translator/)

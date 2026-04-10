@@ -22,7 +22,7 @@ The translation engine has been replaced. See `.claude/phases/` for the complete
 | Code location | Duplicated in library + app (76KB each) | Single engine package, thin adapter in library |
 | Test coverage | 133 tests | 677 engine tests + 133 integration tests |
 
-**Engine source:** `/Users/Shared/GitHub/DMA_NewRelic/` (PR #1 on GitHub)
+**Engine source:** `/Users/Shared/GitHub/nrql-engine/` (PR #1 on GitHub)
 
 ### Code Duplication (eliminated in Phase 01)
 
@@ -114,7 +114,7 @@ Current version: **1.0.36**
 
 ### Add New Function Mapping
 
-**After engine migration:** Add to `DMA_NewRelic/src/compiler/emitter.ts` FUNC_MAP, port tests, publish new engine version.
+**After engine migration:** Add to `nrql-engine/src/compiler/emitter.ts` FUNC_MAP, port tests, publish new engine version.
 
 **Before engine migration:** Edit `NRQLToDQLTranslator.ts` — add to `FUNCTION_MAP`:
 ```typescript
@@ -123,7 +123,7 @@ Current version: **1.0.36**
 
 ### Add New Event Type Mapping
 
-**After engine migration:** Add to `DMA_NewRelic/src/compiler/emitter.ts` QUERY_CLASS_MAP.
+**After engine migration:** Add to `nrql-engine/src/compiler/emitter.ts` QUERY_CLASS_MAP.
 
 **Before engine migration:** Edit `NRQLToDQLTranslator.ts` — add to `EVENT_TYPE_MAP`.
 
@@ -150,7 +150,7 @@ import { Flex, Heading } from "@dynatrace/strato-components";
 
 ## Engine Package Reference
 
-The shared engine at `/Users/Shared/GitHub/DMA_NewRelic/` provides:
+The shared engine at `/Users/Shared/GitHub/nrql-engine/` provides:
 
 | Module | What it does |
 |--------|-------------|

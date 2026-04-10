@@ -2,7 +2,7 @@
 
 ## Shared Engine
 
-The NRQL-to-DQL translation engine lives in a separate repo: `/Users/Shared/GitHub/DMA_NewRelic/`
+The NRQL-to-DQL translation engine lives in a separate repo: `/Users/Shared/GitHub/nrql-engine/`
 (published as `@timstewart-dynatrace/nrql-engine`).
 
 This project (nrql-translator) is a **front-end consumer** of that engine. It provides:
@@ -15,7 +15,7 @@ This project (nrql-translator) is a **front-end consumer** of that engine. It pr
 ### Do NOT duplicate engine logic
 - Translation logic (parsing, mapping, DQL generation) belongs in the engine repo
 - This repo contains only the adapter, CLI, and UI
-- If a new NRQL pattern needs support, add it to DMA_NewRelic, not here
+- If a new NRQL pattern needs support, add it to nrql-engine, not here
 
 ### Adapter pattern
 The adapter wraps `NRQLCompiler.compile()` → `TranslationResult`:
