@@ -29,7 +29,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/bhdynatrace/nrql-translator.git"
+    "url": "https://github.com/timstewart-dynatrace/nrql-translator.git"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -46,9 +46,9 @@
   "author": "Dynabridge Team",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/bhdynatrace/nrql-translator/issues"
+    "url": "https://github.com/timstewart-dynatrace/nrql-translator/issues"
   },
-  "homepage": "https://github.com/bhdynatrace/nrql-translator#readme",
+  "homepage": "https://github.com/timstewart-dynatrace/nrql-translator#readme",
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.0",

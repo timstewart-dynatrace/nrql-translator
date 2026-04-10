@@ -103,7 +103,7 @@ ALL features MUST be documented BEFORE merging to main:
 - [ ] Architecture docs updated if design changed
 
 ### Version Management
-ALL merges to main that add features or fixes MUST increment the version number in **all 4 locations** (see CLAUDE.md Quick Reference).
+ALL merges to main that add features or fixes MUST increment the version number in **both locations** (see CLAUDE.md Quick Reference).
 
 Follow Semantic Versioning 2.0.0:
 - **MAJOR** (X.0.0) — Incompatible API changes
