@@ -18,10 +18,11 @@ This project provides two ways to translate NRQL queries to DQL:
 - Converts New Relic event types to appropriate Dynatrace data sources
 - Supports complex functions: `filter()`, `rate()`, `percentage()`, `cdfPercentage()`, `CASES()`
 - Handles arithmetic expressions between aggregation functions
-- Provides confidence levels (high/medium/low) and warnings for translations
-- Includes notes on data source mapping and key differences
+- Provides confidence levels (high/medium/low) with numeric scores (0-100) and warnings
+- Includes notes on data source mapping, key differences, performance, and testing
+- CLI flags for DQL validation (`--validate`) and auto-fix (`--fix`)
 - Supports both `SELECT ... FROM` and `FROM ... SELECT` syntax
-- Depth-aware parsing handles nested functions like `filter(count(*), WHERE ...)`
+- Powered by `@timstewart-dynatrace/nrql-engine` — 292 AST-compiled patterns, 677 engine tests
 
 ## Supported Translations
 
@@ -38,7 +39,7 @@ This project provides two ways to translate NRQL queries to DQL:
 | `LIMIT MAX` | *(omitted - DQL has no explicit "no limit")* |
 | `ORDER BY attr` | `sort attr asc/desc` |
 | `COMPARE WITH N ago` | `append [subquery]` with time-shifted timestamps |
-| `SLIDE BY interval` | *(warning - not supported in DQL makeTimeseries)* |
+| `SLIDE BY interval` | `makeTimeseries + rolling()` |
 
 ### Function Mapping
 
@@ -175,11 +176,17 @@ npm run build:all
 # Translate a single query
 npm run cli -- query "SELECT count(*) FROM Transaction WHERE appName = 'MyApp'"
 
+# Translate with verbose notes
+npm run cli -- query --verbose "SELECT count(*) FROM Transaction"
+
+# Validate generated DQL syntax
+npm run cli -- query --validate "SELECT count(*) FROM Transaction"
+
+# Auto-fix DQL issues
+npm run cli -- query --fix "SELECT count(*) FROM Transaction"
+
 # Batch translate from Excel
 npm run cli -- excel input.xlsx -o output.xlsx
-
-# Validate against test data
-npm run cli -- validate path/to/test_data/
 
 # Generate Dynatrace notebooks
 npm run cli -- notebook path/to/test_data/ -o notebook.json
@@ -195,13 +202,13 @@ See [INSTALLATION.md](INSTALLATION.md) for detailed build and installation instr
 nrql-translator/
 ├── nrql-translator/           # CLI library
 │   ├── src/
-│   │   ├── core/              # Translation engine (canonical)
-│   │   │   ├── NRQLToDQLTranslator.ts
+│   │   ├── core/              # Adapter wrapping @timstewart-dynatrace/nrql-engine
+│   │   │   ├── NRQLToDQLTranslator.ts  # ~100 line adapter
 │   │   │   └── types.ts
 │   │   └── cli/               # Command-line interface
 │   │       ├── commands/      # excel, query, validate, notebook
 │   │       └── index.ts
-│   └── test/                  # Unit tests (133+ tests)
+│   └── test/                  # Integration tests (151 tests)
 │       ├── unit/
 │       └── fixtures/
 ├── nrql-translator-app/       # Dynatrace App
@@ -209,7 +216,7 @@ nrql-translator/
 │       ├── ui/app/
 │       │   ├── pages/         # Translator UI
 │       │   ├── components/    # Header, Card components
-│       │   └── utils/         # Synced copy of translation engine
+│       │   └── utils/         # Adapter wrapping engine
 │       └── app.config.json
 └── docs/                      # Documentation
 ```
@@ -226,4 +233,4 @@ Contributions are welcome! Please ensure all changes include:
 - Updated documentation
 - Unit tests for new functionality
 - Version increment following semver
-- Synced translator copy to both projects
+- Changes to translation logic go in `nrql-engine`, not here
