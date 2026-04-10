@@ -12,6 +12,10 @@ module.exports = {
   coverageReporters: ['text', 'lcov'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.js$': ['ts-jest', { useESM: false }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!@timstewart-dynatrace/nrql-engine)',
+  ],
 };

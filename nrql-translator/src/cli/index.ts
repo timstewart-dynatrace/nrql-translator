@@ -6,18 +6,21 @@
  */
 
 import { Command } from 'commander';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { executeTranslate } from './commands/translate';
 import { executeValidate, ValidateCommandOptions } from './commands/validate';
 import { executeNotebook, NotebookCommandOptions } from './commands/notebook';
 import { TranslateCommandOptions } from './types';
 import { NRQLToDQLTranslator } from '../core/NRQLToDQLTranslator';
 
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8'));
 const program = new Command();
 
 program
   .name('nrql-translator')
   .description('Translate New Relic NRQL queries to Dynatrace DQL')
-  .version('1.0.0');
+  .version(pkg.version);
 
 program
   .command('excel')

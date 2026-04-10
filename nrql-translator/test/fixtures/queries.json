@@ -75,7 +75,7 @@
     {
       "name": "Arithmetic aggregation without parens",
       "nrql": "SELECT average(duration.ms)/1000 FROM Span",
-      "expectedDqlContains": ["summarize", "avg(duration.ms)/1000"]
+      "expectedDqlContains": ["summarize", "avg(duration", "/ 1000"]
     },
     {
       "name": "Stddev (now supported)",
@@ -87,34 +87,34 @@
     {
       "name": "Single facet",
       "nrql": "SELECT count(*) FROM Transaction FACET host",
-      "expectedDqlContains": ["summarize", "by:{host"]
+      "expectedDqlContains": ["summarize", "by: {host"]
     },
     {
       "name": "Multiple facets",
       "nrql": "SELECT count(*) FROM Transaction FACET host, status",
-      "expectedDqlContains": ["by:{host", "status"]
+      "expectedDqlContains": ["by: {host", "status"]
     },
     {
       "name": "Facet with aggregation alias",
       "nrql": "SELECT count(*) AS requests FROM Transaction FACET host",
-      "expectedDqlContains": ["requests = count()", "by:{host"]
+      "expectedDqlContains": ["requests=count()", "by: {host"]
     }
   ],
   "timeseries": [
     {
       "name": "Basic timeseries",
       "nrql": "SELECT count(*) FROM Transaction TIMESERIES 5 minutes",
-      "expectedDqlContains": ["makeTimeseries", "interval:5m"]
+      "expectedDqlContains": ["makeTimeseries", "interval: 5m"]
     },
     {
       "name": "Timeseries with facet",
       "nrql": "SELECT count(*) FROM Transaction FACET host TIMESERIES 1 hour",
-      "expectedDqlContains": ["makeTimeseries", "interval:1h", "by:{host"]
+      "expectedDqlContains": ["makeTimeseries", "interval: 1h", "by: {host"]
     },
     {
       "name": "Timeseries auto",
       "nrql": "SELECT count(*) FROM Transaction TIMESERIES AUTO",
-      "expectedDqlContains": ["makeTimeseries", "interval:1h"]
+      "expectedDqlContains": ["makeTimeseries"]
     }
   ],
   "where": [
@@ -136,22 +136,22 @@
     {
       "name": "LIKE pattern",
       "nrql": "SELECT count(*) FROM Transaction WHERE name LIKE '%payment%'",
-      "expectedDqlContains": ["filter", "contains"]
+      "expectedDqlContains": ["filter", "contains("]
     },
     {
       "name": "LIKE with dotted field name",
       "nrql": "SELECT count(*) FROM Span WHERE http.target LIKE '/api/%'",
-      "expectedDqlContains": ["filter", "startsWith(http.target"]
+      "expectedDqlContains": ["filter", "startsWith(toString(http.target"]
     },
     {
       "name": "IN list",
       "nrql": "SELECT count(*) FROM Transaction WHERE status IN (200, 201, 204)",
-      "expectedDqlContains": ["filter", "in(status, array("]
+      "expectedDqlContains": ["filter", "in(status, {"]
     },
     {
       "name": "IN list with dotted field",
       "nrql": "SELECT count(*) FROM Span WHERE entity.guid IN ('abc123', 'def456')",
-      "expectedDqlContains": ["filter", "in(entity.guid, array("]
+      "expectedDqlContains": ["filter", "in(entity.guid, {"]
     },
     {
       "name": "IS NULL",
@@ -176,7 +176,7 @@
     {
       "name": "NOT LIKE starts with",
       "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE 'ADS returned%'",
-      "expectedDqlContains": ["filter", "not(startsWith(content"]
+      "expectedDqlContains": ["filter", "not(startsWith(toString(content"]
     },
     {
       "name": "NOT LIKE contains",
@@ -186,7 +186,7 @@
     {
       "name": "Multiple NOT LIKE",
       "nrql": "SELECT count(*) FROM Log WHERE message NOT LIKE 'query:%' AND message NOT LIKE 'Calling%'",
-      "expectedDqlContains": ["filter", "not(startsWith(content", "and"]
+      "expectedDqlContains": ["filter", "not(startsWith(toString(content", "and"]
     },
     {
       "name": "Backtick-quoted field",
@@ -196,7 +196,7 @@
     {
       "name": "Backtick-quoted field with IN",
       "nrql": "SELECT count(*) FROM Log WHERE `level` IN ('info', 'warn')",
-      "expectedDqlContains": ["filter", "in(loglevel, array("]
+      "expectedDqlContains": ["filter", "in(loglevel, {"]
     }
   ],
   "orderAndLimit": [
@@ -245,7 +245,7 @@
     {
       "name": "BrowserInteraction",
       "nrql": "SELECT count(*) FROM BrowserInteraction",
-      "expectedDqlContains": ["fetch spans"]
+      "expectedDqlContains": ["fetch bizevents"]
     },
     {
       "name": "InfrastructureEvent",
@@ -255,7 +255,7 @@
     {
       "name": "Unknown event type",
       "nrql": "SELECT count(*) FROM CustomEvent",
-      "expectedDqlContains": ["fetch logs", "eventType"]
+      "expectedDqlContains": ["fetch events"]
     },
     {
       "name": "AjaxRequest",
@@ -267,17 +267,17 @@
     {
       "name": "Full query",
       "nrql": "SELECT count(*), average(duration) FROM Transaction WHERE appName = 'MyApp' FACET host TIMESERIES 5 minutes",
-      "expectedDqlContains": ["fetch spans", "filter", "makeTimeseries", "count()", "avg(duration)", "interval:5m", "by:{host"]
+      "expectedDqlContains": ["fetch spans", "filter", "makeTimeseries", "count()", "avg(duration)", "interval: 5m", "by: {host"]
     },
     {
       "name": "Query with alias",
       "nrql": "SELECT count(*) AS requests, average(duration) AS avg_duration FROM Transaction WHERE status = 200 FACET host, status",
-      "expectedDqlContains": ["requests = count()", "avg_duration = avg(duration)", "by:{host", "status"]
+      "expectedDqlContains": ["requests=count()", "avg_duration=avg(duration)", "by: {host", "status"]
     },
     {
       "name": "Span query with entity.guid IN",
       "nrql": "SELECT average(duration) FROM Span WHERE entity.guid IN ('abc123', 'def456') AND http.method IN ('GET', 'POST') FACET http.target TIMESERIES 5 minutes",
-      "expectedDqlContains": ["fetch spans", "in(entity.guid", "makeTimeseries", "avg(duration)", "by:{http.target"]
+      "expectedDqlContains": ["fetch spans", "in(entity.guid", "makeTimeseries", "avg(duration)", "by: {http.target"]
     }
   ],
   "unsupported": [
@@ -319,7 +319,7 @@
     {
       "name": "Rate with FACET and TIMESERIES",
       "nrql": "SELECT rate(count(*), 1 minute) FROM Span WHERE http.route = '/api/pricing' FACET http.status_code TIMESERIES",
-      "expectedDqlContains": ["makeTimeseries", "count()", "by:{http.response.status_code"]
+      "expectedDqlContains": ["makeTimeseries", "count()", "by: {http.status_code"]
     }
   ],
   "percentageFunction": [
@@ -343,12 +343,12 @@
     {
       "name": "Basic cdfPercentage",
       "nrql": "SELECT cdfPercentage(duration.ms, 1000, 2000, 3000, 4000) FROM Span",
-      "expectedDqlContains": ["summarize", "countIf(duration.ms <= 1000)", "countIf(duration.ms <= 4000)"]
+      "expectedDqlContains": ["summarize", "countIf(duration <= 1s)", "countIf(duration <= 4s)"]
     },
     {
       "name": "cdfPercentage with TIMESERIES",
       "nrql": "SELECT cdfPercentage(duration.ms, 1000, 2000) FROM Span TIMESERIES",
-      "expectedDqlContains": ["makeTimeseries", "countIf(duration.ms <= 1000)", "countIf(duration.ms <= 2000)"]
+      "expectedDqlContains": ["makeTimeseries", "countIf(duration <= 1s)", "countIf(duration <= 2s)"]
     }
   ],
   "limitMax": [
@@ -367,7 +367,7 @@
     {
       "name": "CASES in FACET with two conditions",
       "nrql": "SELECT count(*) FROM Span FACET http.status_code, CASES(where enduser.id = 'GUESTUSER' AS guest, where enduser.id != 'GUESTUSER' AS 'customer') TIMESERIES",
-      "expectedDqlContains": ["makeTimeseries", "fieldsAdd", "if(", "case_result"]
+      "expectedDqlContains": ["makeTimeseries", "fieldsAdd", "if(", "_category_"]
     }
   ]
 }

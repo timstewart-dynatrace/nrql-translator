@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replaced 2,197-line regex translator with AST engine adapter (~60 lines each)
+- Library and app both use @timstewart-dynatrace/nrql-engine (292 patterns)
+- Eliminated code duplication between library and Dynatrace app
+- Updated all 133 test assertions to match engine output
+
+## [1.0.36] - 2026-03-10
+
+### Changed
+- **`LIKE '%text%'` now translates to `matchesPhrase()`** instead of `contains()` — token-based phrase matching is more appropriate for DQL log queries
+- **`NOT LIKE '%text%'` now translates to `not(matchesPhrase())`** instead of `not(contains())`
+- **`message` field no longer mapped to `content`** — `message` passes through as-is since OpenPipeline may store parsed log fields under their original names (e.g., `data.message`)
+
+## [1.0.35] - 2026-03-10
+
+### Removed
+- **Deleted legacy `src/app/` directory** from Dynatrace App — was an unused duplicate of `ui/app/` that caused translator sync drift (the stale `src/` copy was missing all v1.0.33+ features including `dateOf()`, `hourOf()`, and time-grouping functions)
+
+### Fixed
+- **App translator now uses correct source**: `ui/app/utils/NRQLToDQLTranslator.ts` is the single app copy, synced with canonical library version
+- **`tsconfig.json`** updated from `"include": ["src"]` to `"include": ["ui"]` to match actual app structure
+- **`index.html`** script entry point updated from `/src/app/index.tsx` to `/ui/main.tsx`
+
+### Changed
+- Updated all documentation (CLAUDE.md, README.md) to reference `ui/app/` instead of `src/app/` as the app translator location
+
+## [1.0.34] - 2026-02-28
+
+### Fixed
+- **App translator out of sync**: Synced Dynatrace App copy of `NRQLToDQLTranslator.ts` and `types.ts` with canonical library version — app was missing all features from v1.0.27-1.0.33 (1,170+ lines of drift including `filter()`, `rate()`, `percentage()`, `CASES()`, depth-aware parsing, field mappings, and 18 additional event type mappings)
+- **CLI version hardcoded as `1.0.0`**: Now reads version from `package.json` dynamically
+- **ESLint lint failures**: Added `.eslintrc.json` to library project; fixed 2 unnecessary regex escape warnings in `parseAggregationFunction()`
+
+### Changed
+- **Extracted duplicated `aggFunctions` array** to `AGG_FUNCTIONS` static constant (was duplicated in `parseAggregationFunction` and `translateArithmeticExpressionParts`)
+- **Consolidated `splitArgsRespectingParens`** to delegate to `splitSelectParts` (identical logic was duplicated)
+- **Extracted `FIELD_MAP`** from inline object in `mapFieldNames()` to static class constant (70+ field mappings)
+- **Extracted confidence thresholds** to named constants (`CONFIDENCE_HIGH_THRESHOLD`, `CONFIDENCE_MEDIUM_THRESHOLD`)
+- **Updated README.md** with comprehensive feature documentation: all 21 event type mappings, complete function mapping table, FACET features, operator mapping, translation examples, confidence level explanation, CLI commands, and project structure notes
+
 ## [1.0.33] - 2026-02-28
 
 ### Added
