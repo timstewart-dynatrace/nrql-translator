@@ -1,0 +1,45 @@
+{
+  "projectName": "NRQL Translator",
+  "projectType": "dynatrace-app",
+  "version": "1.1.0",
+  "description": "Translates New Relic NRQL queries to Dynatrace DQL. Includes a TypeScript library/CLI and a Dynatrace App UI.",
+
+  "repository": {
+    "owner": "timstewart-dynatrace",
+    "name": "nrql-translator",
+    "url": "https://github.com/timstewart-dynatrace/nrql-translator"
+  },
+
+  "standards": {
+    "semanticVersioning": true,
+    "branchingStrategy": "feature/fix",
+    "requiresDocumentation": true,
+    "requiresTests": true,
+    "requiresChangeLog": true,
+    "dualVersionControl": true
+  },
+
+  "minimumCodeQuality": {
+    "typeHints": true,
+    "docstrings": true,
+    "linting": "eslint",
+    "typeChecker": "typescript-strict",
+    "testing": "jest",
+    "coverage": 80
+  },
+
+  "reactEnvironment": {
+    "version": "18+",
+    "typescript": "strict",
+    "uiLibrary": "strato-design-system"
+  },
+
+  "versionLocations": [
+    "nrql-translator/package.json",
+    "nrql-translator-app/nrql-translator/app.config.json",
+    "nrql-translator-app/nrql-translator/ui/app/pages/Translator.tsx (APP_VERSION)",
+    ".claude/CLAUDE.md"
+  ],
+
+  "customInstructions": "When a task is complete, perform the 'Reflection Protocol': 1. Update MEMORY.md with non-obvious quirks discovered. 2. Log rejected approaches and decisions to DECISIONS.md. 3. Update active phase file with next logical step. 4. Do not ask permission; do automatically before summarizing."
+}
