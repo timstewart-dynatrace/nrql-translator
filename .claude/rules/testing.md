@@ -2,8 +2,8 @@
 
 ## Test Structure
 
-- **Tests:** `nrql-translator/test/unit/translator.test.ts`
-- **Fixtures:** `nrql-translator/test/fixtures/queries.json` (arrays of `{name, nrql, expectedDqlContains}`)
+- **Tests:** `test/unit/translator.test.ts`
+- **Fixtures:** `test/fixtures/queries.json` (arrays of `{name, nrql, expectedDqlContains}`)
 - Tests use pattern-based assertions (`expect(result.dql).toContain(...)`) rather than exact string matching
 
 ## Test Categories

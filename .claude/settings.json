@@ -35,7 +35,7 @@
   },
 
   "versionLocations": [
-    "nrql-translator/package.json",
+    "package.json",
     ".claude/CLAUDE.md"
   ],
 

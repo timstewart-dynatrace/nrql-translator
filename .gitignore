@@ -1,21 +1,32 @@
-# Ignore spl-translator directory
-spl-translator/
-
-TEMP/ 
-
-# Node modules
+# Dependencies
 node_modules/
 
-# Build output
+# Build outputs
 dist/
 dist-cli/
 
+# Test coverage
+coverage/
+
 # IDE
-.vscode/
 .idea/
+.vscode/
+*.swp
+*.swo
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Logs
 *.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.npmrc
+
+# Project-specific
+spl-translator/
+TEMP/

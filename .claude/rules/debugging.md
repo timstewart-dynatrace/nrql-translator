@@ -10,7 +10,7 @@
 ### 2. Gather Evidence
 ```bash
 # Run tests with verbose output
-cd nrql-translator && npx jest --verbose
+npx jest --verbose
 
 # Check engine output directly
 node -e "const { NRQLCompiler } = require('@timstewart-dynatrace/nrql-engine'); console.log(new NRQLCompiler().compile('YOUR NRQL HERE'))"

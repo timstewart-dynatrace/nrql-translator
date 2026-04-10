@@ -28,7 +28,7 @@ The adapter wraps `NRQLCompiler.compile()` → `TranslationResult`:
 
 ### Version coupling
 When the engine publishes a new version:
-1. Update the dependency in nrql-translator/package.json
+1. Update the dependency in package.json
 2. Run tests to catch any output changes
 3. Bump nrql-translator version in all 4 locations
 4. Update CHANGELOG

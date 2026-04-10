@@ -54,7 +54,6 @@ NRQLToDQLTranslator.translate(nrql)
 ## Essential Commands
 
 ```bash
-cd nrql-translator
 npm install            # Setup
 npm run build          # Compile TS → dist/
 npm run build:cli      # Compile CLI → dist-cli/
@@ -106,7 +105,7 @@ See @.claude/rules/core.md for phase management details.
 
 **CRITICAL:** Update version in **2 places** before deployment:
 
-1. `nrql-translator/package.json` → `"version"`
+1. `package.json` → `"version"`
 2. `.claude/CLAUDE.md` → Version above
 
 Also update `CHANGELOG.md` with changes.

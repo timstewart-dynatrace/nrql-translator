@@ -2,17 +2,14 @@
 
 ## Pre-Deployment
 
-- [ ] All tests passing (`cd nrql-translator && npm test`)
+- [ ] All tests passing (`npm test`)
 - [ ] Build succeeds (`npm run build` and `npm run build:cli`)
-- [ ] App builds (`cd nrql-translator-app/nrql-translator && npm run build`)
 - [ ] Documentation complete (README, CHANGELOG)
-- [ ] Version incremented in all 4 locations
+- [ ] Version incremented in package.json and .claude/CLAUDE.md
 - [ ] No uncommitted changes
 - [ ] No hardcoded credentials or secrets
 
 ## Deployment Steps
-
-### Library (npm publish)
 
 1. **Tag Release**
    ```bash
@@ -22,45 +19,18 @@
 
 2. **Build & Publish**
    ```bash
-   cd nrql-translator
    npm run build
    npm publish
    ```
 
-### Dynatrace App
-
-1. **Build & Deploy**
-   ```bash
-   cd nrql-translator-app/nrql-translator
-   npm run build
-   npm run deploy
-   ```
-
-2. **Verify**
-   - [ ] App loads in Dynatrace tenant
-   - [ ] Translate button works
-   - [ ] Confidence/notes display correctly
-   - [ ] Version shown matches expected
-
 ## Post-Deployment
 
-- [ ] Smoke test: translate 5-10 real NRQL queries
-- [ ] Check for console errors in browser DevTools
-- [ ] Verify version displays correctly in app UI
+- [ ] Smoke test: translate 5-10 real NRQL queries via CLI
 - [ ] Create follow-up issues if needed
 
 ## Rollback
 
-### Library
 ```bash
 npm unpublish @bhdynatrace/nrql-translator@X.Y.Z  # if within 72h
 # Or publish a patched version
-```
-
-### Dynatrace App
-Deploy the previous version from git:
-```bash
-git checkout vPREVIOUS
-cd nrql-translator-app/nrql-translator
-npm run build && npm run deploy
 ```
