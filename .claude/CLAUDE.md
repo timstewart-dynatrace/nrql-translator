@@ -1,64 +1,62 @@
-# CLAUDE.md
+# NRQL Translator
+
+**ALWAYS** ask clarifying questions and **ALWAYS** provide a plan **BEFORE** making changes to ensure the end result matches intent.
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 > **DISCLAIMER**: This is an independent, community-driven project and **not supported by Dynatrace**. Refer to official [Dynatrace documentation](https://docs.dynatrace.com/docs) for authoritative DQL information.
 
+## Project Summary
+
+Translates New Relic NRQL queries to Dynatrace DQL. Provides a TypeScript library for programmatic use, a Commander.js CLI for batch Excel translation, and a Dynatrace App UI for interactive translation. Powered by the AST-based `@timstewart-dynatrace/nrql-engine` (292 compiled patterns, 677 engine tests).
+
+- **Version:** 1.1.0
+
+**Last Updated:** 2026-04-10
+
+## Tech Stack
+
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Runtime | Node.js 18+ | TypeScript support, modern JavaScript |
+| Language | TypeScript (strict) | Type safety, shared types between library and app |
+| Translation Engine | `@timstewart-dynatrace/nrql-engine` | AST-based compiler, 292 patterns, shared package |
+| CLI | Commander.js | Standard Node.js CLI framework |
+| App UI | React 18 + Strato Design System | Dynatrace native components |
+| Testing | Jest + ts-jest | Unit and integration tests |
+| Linting | ESLint | Code quality |
+| App Build | dt-app (Vite-based) | Dynatrace app bundler |
+
 ## Architecture
 
-This repo contains **two sibling projects** that will share a common engine:
+See [architecture.md](architecture.md) for detailed project structure, components, and data flow.
 
-- **Library/CLI** (`nrql-translator/`) — TypeScript library + Commander.js CLI for batch Excel translation
-- **Dynatrace App** (`nrql-translator-app/nrql-translator/`) — React UI using Strato Design System, deployed via `dt-app`
+### Engine Integration
 
-### Engine Migration (COMPLETE)
+The translation engine lives in a separate repo: `/Users/Shared/GitHub/nrql-engine/` (published as `@timstewart-dynatrace/nrql-engine`).
 
-The translation engine has been replaced. See `.claude/phases/` for the completed plan.
-
-| Component | Old (current) | New (target) |
-|-----------|--------------|--------------|
-| Translator | 2,197-line regex-based `NRQLToDQLTranslator` | AST-based `NRQLCompiler` from `@timstewart-dynatrace/nrql-engine` |
-| Patterns | ~80 regex patterns | 292 AST-compiled patterns |
-| Code location | Duplicated in library + app (76KB each) | Single engine package, thin adapter in library |
-| Test coverage | 133 tests | 677 engine tests + 133 integration tests |
-
-**Engine source:** `/Users/Shared/GitHub/nrql-engine/` (PR #1 on GitHub)
-
-### Code Duplication (eliminated in Phase 01)
-
-The core translator is no longer duplicated. Both the library and the Dynatrace app are thin adapters (~60 lines each) around the shared `@timstewart-dynatrace/nrql-engine` package. Translation logic changes go into the engine package only.
+| Component | Details |
+|-----------|---------|
+| Translator | AST-based `NRQLCompiler` from engine (292 patterns) |
+| Adapter | Thin ~60-line wrapper mapping `CompileResult` → `TranslationResult` |
+| Code location | Single engine package; thin adapters in library and app |
+| Test coverage | 677 engine tests + 133 integration tests |
 
 ### Translation Flow
 
-Current: `NRQLToDQLTranslator.translate(nrql)` → `TranslationResult { dql, notes, confidence, warnings }`
+```
+NRQLToDQLTranslator.translate(nrql)
+  → NRQLCompiler.compile(nrql)
+  → CompileResult { dql, confidence, confidenceScore, notes, warnings, fixes }
+  → Adapter maps to TranslationResult { dql, confidence, notes, warnings }
+```
 
-Target: `NRQLCompiler.compile(nrql)` → `CompileResult { dql, notes, confidence, confidenceScore, warnings, fixes }`
-
-The adapter maps CompileResult → TranslationResult so the public API stays the same.
-
-### Key Internal Patterns
-
-- **Depth-aware parsing**: All clause keyword detection uses `findClauseKeyword()` / `extractUntilClauseKeyword()` which track parenthesis depth. Never use regex to match clause keywords — it fails when keywords appear inside function args like `filter(count(*), WHERE ...)`.
-- **Static mapping tables**: `FUNCTION_MAP`, `UNSUPPORTED_FUNCTIONS`, `EVENT_TYPE_MAP` — prefer updating these before adding new parser logic.
-- **Arithmetic expressions**: `parseAggregationFunction()` has three detection paths: Pattern 1 (outer parens), Pattern 2 (func OP number), arithmetic continuation (func OP func). All produce `_arithmetic_` type handled by `translateArithmeticExpressionParts()`.
-- **COMPARE WITH**: Generates `append [subquery]` with time-shifted timestamps.
-
-## Migration Phases
-
-See `.claude/phases/` for detailed plans:
-
-| Phase | Goal | Status |
-|-------|------|--------|
-| 01 | Publish engine, wire library + app, eliminate duplication | Done |
-| 02 | Align tests, close coverage gaps, calibrate confidence | Pending |
-| 03 | CLI and app feature parity (notes, validator, fixer) | Pending |
-| 04 | Version bump, release, deploy | Pending |
-
-## Build & Test Commands
+## Essential Commands
 
 ```bash
 # Library/CLI (run from nrql-translator/)
 cd nrql-translator
+npm install            # Setup
 npm run build          # Compile TS → dist/
 npm run build:cli      # Compile CLI → dist-cli/
 npm run build:all      # Both
@@ -68,64 +66,81 @@ npm run lint:fix       # ESLint with auto-fix
 npm run typecheck      # tsc --noEmit
 npm run cli            # Build + run CLI
 
+# Single test
+npx jest --testNamePattern="filter.*arithmetic"
+npx jest --verbose
+
 # Dynatrace App (run from nrql-translator-app/nrql-translator/)
 cd nrql-translator-app/nrql-translator
+npm install            # Setup
 npm run start          # dt-app dev (hot reload)
 npm run build          # dt-app build
 npm run deploy         # dt-app deploy to tenant
 ```
 
-### Running a Single Test
+## Current Phase
 
-```bash
-cd nrql-translator
-npx jest --testNamePattern="filter.*arithmetic"   # by test name pattern
-npx jest --verbose                                 # see all test names
-```
+Before starting work, check `.claude/phases/` for the active phase.
+- **Phase 01:** Done — Published engine, wired library + app, eliminated duplication
+- **Phase 02:** Pending — Align tests, close coverage gaps, calibrate confidence
+- **Phase 03:** Pending — CLI and app feature parity (notes, validator, fixer)
+- **Phase 04:** Pending — Version bump, release, deploy
 
-### Test Structure
+See @.claude/rules/core.md for phase management details.
 
-- Tests: `nrql-translator/test/unit/translator.test.ts`
-- Fixtures: `nrql-translator/test/fixtures/queries.json` (arrays of `{name, nrql, expectedDqlContains}`)
-- Tests use pattern-based assertions (`expect(result.dql).toContain(...)`) rather than exact string matching
+## Rules
 
-## Version Management
+### Always active
+@.claude/rules/core.md
+@.claude/rules/development.md
+@.claude/rules/testing.md
+@.claude/rules/deployment.md
 
-**MANDATORY** — increment on EVERY change, in all 4 locations:
+### Debugging & Troubleshooting
+@.claude/rules/debugging.md
+@.claude/rules/existing-code.md
+
+### Language & Framework
+@.claude/rules/typescript.md
+@.claude/rules/frontend.md
+@.claude/rules/dynatrace-sdk.md
+
+### Domain-specific (project rules)
+@.claude/rules/engine-integration.md
+@.claude/rules/dynatrace-dql.md
+@.claude/rules/dql-functions-reference.md
+@.claude/rules/dql-common-patterns.md
+@.claude/rules/dql-examples.md
+
+## Quick Reference — Version Management
+
+**CRITICAL:** Update version in **4 places** before deployment:
 
 1. `nrql-translator/package.json` → `"version"`
 2. `nrql-translator-app/nrql-translator/app.config.json` → `"version"`
 3. `nrql-translator-app/nrql-translator/ui/app/pages/Translator.tsx` → `APP_VERSION` constant
-4. `.claude/CLAUDE.md` → version below
-5. `CHANGELOG.md` → new entry (Keep a Changelog format)
+4. `.claude/CLAUDE.md` → Version above
 
-Current version: **1.0.36**
+All **MUST** match exactly. Also update `CHANGELOG.md` with changes.
 
-## Workflow
+## Key DQL Syntax Rules
 
-1. Create feature branch: `feature/X.Y.Z-description`
-2. Make changes (sync translator to both projects if modified — until Phase 01 eliminates duplication)
-3. Run tests: `cd nrql-translator && npm test`
-4. Update version in all 4 locations + CHANGELOG.md
-5. Commit with descriptive message
-6. Merge to main with `--no-ff`
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| Arrays | `{"a", "b"}` | `('a', 'b')` |
+| Equality | `field == "value"` | `field = 'value'` |
+| IN operator | `in(field, array("a", "b"))` | `field IN ('a', 'b')` |
+| Named params | `round(val, decimals: 2)` | `round(val, 2)` |
 
 ## Common Tasks
 
 ### Add New Function Mapping
 
-**After engine migration:** Add to `nrql-engine/src/compiler/emitter.ts` FUNC_MAP, port tests, publish new engine version.
-
-**Before engine migration:** Edit `NRQLToDQLTranslator.ts` — add to `FUNCTION_MAP`:
-```typescript
-'newfunction': { dql: 'dqlequivalent', notes: 'optional notes' },
-```
+Add to `nrql-engine/src/compiler/emitter.ts` FUNC_MAP, port tests, publish new engine version. Then update the dependency here.
 
 ### Add New Event Type Mapping
 
-**After engine migration:** Add to `nrql-engine/src/compiler/emitter.ts` QUERY_CLASS_MAP.
-
-**Before engine migration:** Edit `NRQLToDQLTranslator.ts` — add to `EVENT_TYPE_MAP`.
+Add to `nrql-engine/src/compiler/emitter.ts` QUERY_CLASS_MAP. Publish and update dependency.
 
 ### Dynatrace App: Strato Imports
 
@@ -139,34 +154,6 @@ import { Heading } from "@dynatrace/strato-components/typography";
 import { Flex, Heading } from "@dynatrace/strato-components";
 ```
 
-## Key DQL Syntax Rules
+## Decision Log
 
-| Rule | Correct | Wrong |
-|------|---------|-------|
-| Arrays | `{"a", "b"}` | `('a', 'b')` |
-| Equality | `field == "value"` | `field = 'value'` |
-| IN operator | `in(field, array("a", "b"))` | `field IN ('a', 'b')` |
-| Named params | `round(val, decimals: 2)` | `round(val, 2)` |
-
-## Engine Package Reference
-
-The shared engine at `/Users/Shared/GitHub/nrql-engine/` provides:
-
-| Module | What it does |
-|--------|-------------|
-| `compiler/` | AST-based NRQL→DQL (292 patterns) |
-| `validators/` | DQL syntax validator + 22-method auto-fixer |
-| `transformers/` | 10 entity transformers (dashboard, alert, etc.) |
-| `clients/` | NR NerdGraph + DT API clients |
-| `config/` | Settings with zod + dotenv |
-| `registry/` | Live DT environment validation |
-| `migration/` | State, checkpoint, retry, diff |
-
-```typescript
-// Usage after Phase 01:
-import { NRQLCompiler } from '@timstewart-dynatrace/nrql-engine';
-
-const compiler = new NRQLCompiler();
-const result = compiler.compile("SELECT count(*) FROM Transaction TIMESERIES");
-// result.dql, result.confidence, result.confidenceScore, result.notes, result.warnings
-```
+See `.claude/DECISIONS.md` to track architectural and technical decisions.
