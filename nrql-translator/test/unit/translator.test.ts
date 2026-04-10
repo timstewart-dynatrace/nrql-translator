@@ -287,6 +287,141 @@ describe('NRQLToDQLTranslator', () => {
     });
   });
 
+  describe('histogram() function', () => {
+    for (const testCase of fixtures.histogramFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should produce a warning about histogram decomposition', () => {
+      const result = translator.translate(
+        "SELECT histogram(duration, 100, 10) FROM Transaction"
+      );
+      expect(result.warnings.some(w => w.includes('histogram'))).toBe(true);
+    });
+
+    it('should produce high confidence for histogram', () => {
+      const result = translator.translate(
+        "SELECT histogram(duration, 100, 10) FROM Transaction"
+      );
+      expect(result.confidence).toBe('high');
+    });
+  });
+
+  describe('funnel() function', () => {
+    for (const testCase of fixtures.funnelFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should produce a warning about funnel decomposition', () => {
+      const result = translator.translate(
+        "SELECT funnel(session, WHERE page = 'home', WHERE page = 'cart') FROM PageView"
+      );
+      expect(result.warnings.some(w => w.toLowerCase().includes('funnel'))).toBe(true);
+    });
+
+    it('should produce high confidence for funnel', () => {
+      const result = translator.translate(
+        "SELECT funnel(session, WHERE page = 'home', WHERE page = 'cart') FROM PageView"
+      );
+      expect(result.confidence).toBe('high');
+    });
+  });
+
+  describe('apdex() function', () => {
+    for (const testCase of fixtures.apdexFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should produce a warning about apdex decomposition', () => {
+      const result = translator.translate(
+        "SELECT apdex(duration, 0.5) FROM Transaction"
+      );
+      expect(result.warnings.some(w => w.toLowerCase().includes('apdex'))).toBe(true);
+    });
+
+    it('should produce high confidence for apdex', () => {
+      const result = translator.translate(
+        "SELECT apdex(duration, 0.5) FROM Transaction"
+      );
+      expect(result.confidence).toBe('high');
+    });
+  });
+
+  describe('Subquery (nested SELECT)', () => {
+    for (const testCase of fixtures.subqueryFunction) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should convert subquery to lookup pattern', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction WHERE host IN (SELECT uniques(host) FROM Transaction WHERE appName = 'MyApp')"
+      );
+      expect(result.dql).toContain('lookup');
+      expect(result.dql).toContain('fetch spans');
+      expect(result.confidence).toBe('high');
+    });
+  });
+
+  describe('SLIDE BY clause', () => {
+    for (const testCase of fixtures.slideBy) {
+      it(`should translate: ${testCase.name}`, () => {
+        const result = translator.translate(testCase.nrql);
+
+        expect(result.dql).toBeDefined();
+
+        for (const expected of testCase.expectedDqlContains) {
+          expect(result.dql.toLowerCase()).toContain(expected.toLowerCase());
+        }
+      });
+    }
+
+    it('should produce a warning about SLIDE BY conversion', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction TIMESERIES 30 minutes SLIDE BY 10 minutes"
+      );
+      expect(result.warnings.some(w => w.includes('SLIDE BY'))).toBe(true);
+    });
+
+    it('should produce high confidence for SLIDE BY', () => {
+      const result = translator.translate(
+        "SELECT count(*) FROM Transaction TIMESERIES 30 minutes SLIDE BY 10 minutes"
+      );
+      expect(result.confidence).toBe('high');
+    });
+  });
+
   describe('TranslationResult structure', () => {
     it('should return complete TranslationResult', () => {
       const result = translator.translate('SELECT count(*) FROM Transaction');
@@ -309,12 +444,13 @@ describe('NRQLToDQLTranslator', () => {
       expect(['high', 'medium']).toContain(result.confidence);
     });
 
-    it('should return lower confidence for queries with unsupported features', () => {
-      // Multiple unsupported functions to lower confidence
+    it('should handle queries with formerly-unsupported features', () => {
+      // Engine now handles histogram and funnel — they produce DQL with warnings
       const result = translator.translate(
         'SELECT histogram(duration, 100, 10), funnel(session, WHERE step1, WHERE step2) FROM Transaction'
       );
-      expect(['medium', 'low']).toContain(result.confidence);
+      expect(result.dql).toBeDefined();
+      expect(result.warnings.length).toBeGreaterThan(0);
     });
   });
 
@@ -715,13 +851,14 @@ describe('NRQLToDQLTranslator', () => {
     });
   });
 
-  describe('SLIDE BY warning', () => {
-    it('should warn about SLIDE BY not being supported', () => {
+  describe('SLIDE BY warning (legacy)', () => {
+    it('should translate SLIDE BY with rolling() and include informational warning', () => {
       const result = translator.translate(
         "SELECT count(*) FROM Transaction TIMESERIES 30 minutes SLIDE BY 10 minutes"
       );
       expect(result.warnings.some(w => w.includes('SLIDE BY'))).toBe(true);
       expect(result.dql).toContain('makeTimeseries');
+      expect(result.dql).toContain('rolling');
     });
   });
 

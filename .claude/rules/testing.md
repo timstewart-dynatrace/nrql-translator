@@ -8,7 +8,7 @@
 
 ## Test Categories
 
-### Integration Tests (133+)
+### Integration Tests (151)
 - Test end-to-end translation: NRQL input → DQL output
 - Run through the adapter layer (engine + adapter)
 - Located in `test/unit/translator.test.ts`
@@ -38,7 +38,7 @@ npx jest --coverage
 ## Test Requirements
 
 ### Before Merging
-- [ ] All 133+ integration tests pass
+- [ ] All 151 integration tests pass
 - [ ] No test warnings or errors
 - [ ] New features have test coverage
 - [ ] Bug fixes include a test that reproduces the bug

@@ -40,7 +40,7 @@ The translation engine lives in a separate repo: `/Users/Shared/GitHub/nrql-engi
 | Translator | AST-based `NRQLCompiler` from engine (292 patterns) |
 | Adapter | Thin adapter (~60-100 lines) mapping `CompileResult` → `TranslationResult` |
 | Code location | Single engine package; thin adapters in library and app |
-| Test coverage | 677 engine tests + 133 integration tests |
+| Test coverage | 677 engine tests + 151 integration tests |
 
 ### Translation Flow
 
@@ -60,7 +60,7 @@ npm install            # Setup
 npm run build          # Compile TS → dist/
 npm run build:cli      # Compile CLI → dist-cli/
 npm run build:all      # Both
-npm test               # Jest (133+ tests)
+npm test               # Jest (151 tests)
 npm run lint           # ESLint
 npm run lint:fix       # ESLint with auto-fix
 npm run typecheck      # tsc --noEmit
